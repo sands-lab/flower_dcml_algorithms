@@ -2,7 +2,7 @@ import torch
 
 
 @torch.no_grad
-def test_accuracy(model, dataloader, device=torch.device("cuda:0")):
+def test_accuracy(model, dataloader, device):
     model.eval()
     correct_predictions = 0
     for images, targets in dataloader:

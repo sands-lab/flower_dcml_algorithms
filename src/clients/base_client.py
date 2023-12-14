@@ -67,5 +67,5 @@ class BaseClient(fl.client.NumPyClient):
     def evaluate(self, parameters, config):
         self.set_parameters(self.model, parameters)
         testloader = self._init_dataloader(train=False, batch_size=32)
-        accuracy = test_accuracy(self.model, testloader)
+        accuracy = test_accuracy(self.model, testloader, self.device)
         return accuracy, len(testloader.dataset), {"accuracy": accuracy, "client_id": self.idx}
