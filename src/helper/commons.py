@@ -19,46 +19,48 @@ def load_data_config(partition_folder):
     return data
 
 
-def _get_rng_file_names(_self):
+def _get_rng_file_names(working_folder):
     try:
-        folder = _self.client_working_folder
-        torch_file = f"{folder}/torch_rng.pth"
-        np_file = f"{folder}/np_rng.pth"
-        py_file = f"{folder}/py_rng.pth"
+        torch_file = f"{working_folder}/torch_rng.pth"
+        np_file = f"{working_folder}/np_rng.pth"
+        py_file = f"{working_folder}/py_rng.pth"
+        assert os.path.exists(torch_file) == \
+                os.path.exists(np_file) == \
+                os.path.exists(py_file)
         return torch_file, np_file, py_file
     except AttributeError:
         return None, None, None
 
 
+def _save_rng_state(torch_file, np_file, py_file):
+    torch.save(torch.get_rng_state(), torch_file)
+    with open(py_file, "wb") as fppy, open(np_file, "wb") as fpnp:
+        pickle.dump(np.random.get_state(), fpnp)
+        pickle.dump(random.getstate(), fppy)
+
+
+def save_rng_state_if_not_exists(working_folder):
+    torch_file, np_file, py_file = _get_rng_file_names(working_folder)
+    if not os.path.exists(torch_file):
+        _save_rng_state(torch_file, np_file, py_file)
+
+
 def sync_rng_state(func):
-    def wrapper(self, *args, **kwargs):
+    def wrapper(_self, *args, **kwargs):
         # define files
-        torch_file, np_file, py_file = _get_rng_file_names(self)
+        torch_file, np_file, py_file = \
+            _get_rng_file_names(_self.client_working_folder)
 
         # load RNG states
-        if torch_file is not None and os.path.exists(torch_file):
-            torch.set_rng_state(torch.load(torch_file))
-            with open(py_file, "rb") as fppy, open(np_file, "rb") as fpnp:
-                random.setstate(pickle.load(fppy))
-                np.random.set_state(pickle.load(fpnp))
-        elif torch_file is not None:
-            assert not os.path.exists(torch_file)
-            assert not os.path.exists(np_file)
-            assert not os.path.exists(py_file)
+        torch.set_rng_state(torch.load(torch_file))
+        with open(py_file, "rb") as fppy, open(np_file, "rb") as fpnp:
+            random.setstate(pickle.load(fppy))
+            np.random.set_state(pickle.load(fpnp))
 
         # trigger computation
-        result = func(self, *args, **kwargs)
+        result = func(_self, *args, **kwargs)
 
-        # store new RNG states
-        if torch_file is None:
-            torch_file, np_file, py_file = _get_rng_file_names(self)
-            assert not (torch_file is None or np_file is None or py_file is None)
-
-        torch.save(torch.get_rng_state(), torch_file)
-        with open(py_file, "wb") as fppy, open(np_file, "wb") as fpnp:
-            pickle.dump(np.random.get_state(), fpnp)
-            pickle.dump(random.getstate(), fppy)
-
+        _save_rng_state(torch_file, np_file, py_file)
         # return result
         return result
     return wrapper

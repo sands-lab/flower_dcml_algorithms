@@ -33,4 +33,4 @@ class WandbEvaluation:
         })
         self.epoch += 1
 
-        return {"accuracy": np.mean(accuracies).item()}
+        return {"accuracy": np.average(accuracies, weights=dataset_sizes).item()}

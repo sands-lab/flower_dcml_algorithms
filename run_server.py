@@ -1,4 +1,5 @@
 import os
+import math
 
 import flwr as fl
 from logging import INFO, WARNING
@@ -23,7 +24,7 @@ cs.store(name="config", node=ParamConfig)
 def main(cfg: ParamConfig):
 
     partitions_home_folder = "./data/partitions"
-    server_ip = os.environ.get("FLTB_SERVER_IP")
+    server_ip = os.environ.get("FLTB_SERVER_ADDRESS")
     log_to_wandb = int(os.environ.get("LOG_TO_WANDB", "0"))
     assert log_to_wandb in {0, 1}, "Logging to wandb should be set to either 0 or 1"
     log_to_wandb = bool(log_to_wandb)
@@ -48,18 +49,20 @@ def main(cfg: ParamConfig):
     evaluator = WandbEvaluation(log_to_wandb)
 
     # Create strategy
+    n_clients = 2  # int(data_config["num_clients"])
+    log(INFO, f"Waiting for {n_clients} clients...")
+    set_seed(cfg.general.seed)
     strategy = instantiate(
         cfg.fl_algorithm.strategy,
         n_classes=n_classes,
-        fraction_fit=cfg.global_train.fraction_fit,  # Sample 100% of available clients for training
-        fraction_evaluate=cfg.global_train.fraction_eval,  # Sample 50% of available clients for evaluation
-        min_fit_clients=1,  # Never sample less than 10 clients for training
-        min_evaluate_clients=1,  # Never sample less than 5 clients for evaluation
-        min_available_clients=1,  # Wait until all 10 clients are available
+        fraction_fit=cfg.global_train.fraction_fit,
+        fraction_evaluate=cfg.global_train.fraction_eval,
+        min_fit_clients=int(math.floor(cfg.global_train.fraction_fit * n_clients)),
+        min_evaluate_clients=int(math.floor(cfg.global_train.fraction_eval * n_clients)),
+        min_available_clients=n_clients,
         evaluate_metrics_aggregation_fn=evaluator.evaluate,
         on_fit_config_fn=construct_config_fn(cfg.local_train)
     )
-    set_seed(cfg.general.seed)
 
     log(INFO, f"Starting server on IP: {server_ip}")
     fl.server.start_server(

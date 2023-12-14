@@ -2,7 +2,10 @@ from src.models.training_procedures import train
 from src.clients.base_client import BaseClient
 from src.helper.commons import sync_rng_state
 
+from fltb.decorators import MonitorFlwrClient
 
+
+@MonitorFlwrClient
 class FedAvgClient(BaseClient):
 
     @sync_rng_state
@@ -21,5 +24,4 @@ class FedAvgClient(BaseClient):
 
 
 def client_fn(cid, images_folder, partition_folder, seed, experiment_folder) -> FedAvgClient:
-    print(f"here {cid} {images_folder} {partition_folder} {seed}")
     return FedAvgClient(int(cid), images_folder, partition_folder, seed, experiment_folder, model_name="convnet")

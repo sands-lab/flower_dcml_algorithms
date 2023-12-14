@@ -21,8 +21,8 @@ def main(cfg: ParamConfig):
     #read the environment variables
     data_home_folder = os.environ.get("FLTB_DATA_HOME_FOLDER")
     partitions_home_folder = "./data/partitions"
-    client_idx = os.environ.get("FLTB_CLIENT_INDEX")
-    server_ip = os.environ.get("FLTB_SERVER_IP")
+    client_idx = os.environ.get("FLTB_CLIENT_ID")
+    server_ip = os.environ.get("FLTB_SERVER_ADDRESS")
 
     partitions_exp_folder = f"{partitions_home_folder}/{cfg.data.dataset}/{cfg.data.partitioning_configuration}"
 

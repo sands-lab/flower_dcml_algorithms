@@ -1,9 +1,22 @@
 #!/bin/bash
 
-export LOG_TO_WANDB=1
+
+function clean_up {
+    for pid in ${pids[*]}; do
+        if ps -p $pid > /dev/null; then
+            echo "Killing $pid"
+            kill $pid
+        fi
+    done
+    exit 1
+}
+trap clean_up SIGHUP SIGINT SIGTERM
+
+
+export LOG_TO_WANDB=0
 export SYNC_WITH_WANDB_CLOUD=0
 export IBEX_SIMULATION=1
-export NUM_CLIENTS=5
+export NUM_CLIENTS=19
 
 # set up wandb to work offline
 export HYDRA_FULL_ERROR=1
@@ -36,7 +49,7 @@ sleep 15
 
 for i in $(seq 0 $NUM_CLIENTS);
 do
-    export FLTB_CLIENT_INDEX=$i
+    export FLTB_CLIENT_ID=$i
     echo "Client ::: Starting client ${i}..."
     python run_client.py "$@" &
     pids[$i]=$!
