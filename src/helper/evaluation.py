@@ -20,7 +20,8 @@ class WandbEvaluation:
                 "dataset_size": dataset_size,
                 "client_idx": client_idx,
                 "type": "client",
-                "epoch": self.epoch
+                "epoch": self.epoch,
+                "elapsed_time": time.time() - self.start_time
             })
         self.log_data({
             "accuracy": np.mean(accuracies).item(),

@@ -40,7 +40,7 @@ def main(cfg: ParamConfig):
 
     if log_to_wandb:
         log(INFO, "Initializing wandb")
-        wandb_config_dict = generate_wandb_config(cfg) | data_config
+        wandb_config_dict = {**generate_wandb_config(cfg), **data_config}
         wandb.init(
             project="test-project",
             config=wandb_config_dict
@@ -69,9 +69,9 @@ def main(cfg: ParamConfig):
     )
     log(INFO, "Experiment completed.")
     if log_to_wandb:
-        log(INFO, "Syncing wandb...")
+        log(INFO, "Syncing wandb to local folder...")
         wandb.finish()
-        log(INFO, "Wandb synced")
+        log(INFO, "Wandb locally synced")
 
 
 if __name__ == "__main__":

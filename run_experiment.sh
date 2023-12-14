@@ -1,7 +1,9 @@
 #!/bin/bash
 
 export LOG_TO_WANDB=1
+export SYNC_WITH_WANDB_CLOUD=0
 export IBEX_SIMULATION=1
+export NUM_CLIENTS=5
 
 # set up wandb to work offline
 export HYDRA_FULL_ERROR=1
@@ -30,9 +32,9 @@ python run_server.py "$@" &
 pids[99999]=$!
 echo "Server ::: Server started!"
 
-sleep 30
+sleep 15
 
-for i in $(seq 0 10);
+for i in $(seq 0 $NUM_CLIENTS);
 do
     export FLTB_CLIENT_INDEX=$i
     echo "Client ::: Starting client ${i}..."
@@ -48,7 +50,7 @@ done
 
 echo "All clients completed!"
 
-if [[ $LOG_TO_WANDB == 1 ]]; then
+if [[ $LOG_TO_WANDB == 1 && $SYNC_WITH_WANDB_CLOUD == 1 ]]; then
     echo "Starting to sync offline results to Wandb cloud"
     source ./secrets.env
     cd logs/
@@ -56,4 +58,6 @@ if [[ $LOG_TO_WANDB == 1 ]]; then
     cd ..
     cd $TEMP_DIR
     wandb sync --include-offline --sync-all
+else
+    echo "Skipping upload to W&B cloud..."
 fi
