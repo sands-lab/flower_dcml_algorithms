@@ -1,0 +1,23 @@
+defaults:
+  - fl_algorithm: fedavg
+  - _self_
+
+data:
+  dataset: cifar10
+  partitioning_configuration: dirichlet_20clients_23seed_20.0alpha_0.2test
+global_train:  # parameters passed to the strategy during initialization
+  epochs: 2
+  fraction_fit: 0.2
+  fraction_eval: 0.5
+local_train:  # passed to the client in the config file
+  lr: 0.001
+  local_epochs: 1
+  batch_size: 32
+  optimizer: "adam"
+general:
+  seed: 10
+
+hydra:
+  output_subdir: null
+  run:
+    dir: .

@@ -1,0 +1,4 @@
+client:
+  _target_: src.clients.fedavg_client.client_fn
+strategy:
+  _target_: src.strategies.fedavg.FedAvg  # target + kwargs passed to initialization

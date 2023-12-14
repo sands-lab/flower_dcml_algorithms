@@ -1,0 +1,10 @@
+logs/*
+__pycache__/
+data/client
+data/partitions
+data/raw
+*.log
+dcgm/
+outputs/
+wandb/
+secrets.env

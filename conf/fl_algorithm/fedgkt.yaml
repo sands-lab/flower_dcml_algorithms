@@ -1,0 +1,4 @@
+client:
+  _target_: src.clients.fedgkt_client.client_fn
+strategy:
+  _target_: src.strategies.fedgkt.FedGKT

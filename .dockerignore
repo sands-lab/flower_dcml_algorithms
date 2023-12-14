@@ -1,0 +1,9 @@
+logs/
+__pycache__/
+data/raw
+data/client
+*.log
+dcgm/
+outputs/
+wandb/
+secrets.env

@@ -1,0 +1,4 @@
+client:
+  _target_: src.clients.fd_client.client_fn
+strategy:
+  _target_: src.strategies.fd.FD
