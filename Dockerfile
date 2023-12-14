@@ -11,7 +11,3 @@ RUN pip install -r requirements.txt
 COPY . .
 
 CMD ["/bin/bash", "./run_experiment.sh"]
-
-# then, run with
-# docker build -t test .
-# docker run -it --rm -v ./data/raw/:/app/data/raw test
