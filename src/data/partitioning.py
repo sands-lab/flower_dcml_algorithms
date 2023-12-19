@@ -26,7 +26,7 @@ def partition_class_samples_with_dirichlet_distribution(
         idx_j + idx.tolist()
         for idx_j, idx in zip(idx_batch, np.split(idx_k, proportions))
     ]
-    min_size = min([len(idx_j) for idx_j in idx_batch])
+    min_size = min(len(idx_j) for idx_j in idx_batch)
 
     return idx_batch, min_size
 
@@ -54,9 +54,9 @@ def dirichlet_split(
         np.random.shuffle(idx_batch[i])
         net_dataidx_map[i] = idx_batch[i]
 
-    assert len(labels) == sum([len(indices) for _, indices in net_dataidx_map.items()]), \
+    assert len(labels) == sum(len(indices) for _, indices in net_dataidx_map.items()), \
         f"Some samples were not assigned to a client." \
-        f" {len(labels)} != {sum([len(indices) for _, indices in net_dataidx_map.items()])}"
+        f" {len(labels)} != {sum(len(indices) for _, indices in net_dataidx_map.items())}"
     # assert that there is no intersection between clients indices!
     assert all((set(p0).isdisjoint(set(p1))) for p0, p1 in
                itertools.combinations([indices for _, indices in net_dataidx_map.items()], 2))
@@ -123,8 +123,8 @@ def _generate_dirichlet_partition(raw_data_folder, partitions_home_folder, datas
     Path(partition_folder).mkdir(parents=True, exist_ok=False)
 
     trainsets, testsets = [], []
-    for partition_idx in subsets.keys():
-        partition_df = df[df["idx"].isin(subsets[partition_idx])]
+    for subset in subsets.values():
+        partition_df = df[df["idx"].isin(subset)]
         test_size = int(partition_df.shape[0] * test_percentage)
         partition_test_df = partition_df.iloc[:test_size]
         partition_train_df = partition_df.iloc[test_size:]

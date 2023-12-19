@@ -1,7 +1,6 @@
 import numpy as np
 import torch
 
-from src.models.evaluation_procedures import test_accuracy
 from src.models.training_procedures import train_fd
 from src.clients.base_client import BaseClient
 

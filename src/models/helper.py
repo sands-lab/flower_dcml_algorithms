@@ -5,7 +5,7 @@ from src.models.convnet import ConvNet, ConvNet2
 
 def construct_matrix(preds, targets, num_classes):
     assert num_classes == preds.shape[1]
-    result_matrix = torch.zeros((num_classes, num_classes), device=preds.device)  # Initialize result matrix with zeros
+    result_matrix = torch.zeros((num_classes, num_classes), device=preds.device)
     for y in torch.unique(targets):
         indices = (targets == y).nonzero(as_tuple=True)[0]
         result_matrix[y] = torch.sum(preds[indices].detach(), dim=0)

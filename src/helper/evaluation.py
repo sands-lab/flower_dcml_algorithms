@@ -1,5 +1,6 @@
 import time
 
+import pandas as pd
 import numpy as np
 import wandb
 
@@ -28,14 +29,21 @@ class WandbEvaluation:
         metric_keys = {k for k in metrics[0][1].keys() if k != "client_id"}
         client_idxs = [metrics["client_id"] for _, metrics in metrics]
         metric_values = {k: [vals[k] for _, vals in metrics] for k in metric_keys}
-        for idx in range(len(metrics)):
-            log_dict = \
-                self._init_dict(dataset_sizes[idx], client_idxs[idx], "client", fit_aggregation)
-            for k, v in metric_values.items():
-                log_dict[k] = v[idx]
-            self.log_data(log_dict)
 
-        global_log_dict = self._init_dict(sum(dataset_sizes), -1, "global", fit_aggregation)
+        pd_table = pd.DataFrame({
+            "dataset_sizes": dataset_sizes,
+            "client_idxs": client_idxs,
+            **metric_values
+        })
+        wandb_table = wandb.Table(dataframe=pd_table)
+
+        global_log_dict = {
+            "dataset_size": sum(dataset_sizes),
+            "epoch": self.epoch,
+            "elapsed_time": time.time() - self.start_time,
+            "fit_aggregation": fit_aggregation,
+            "client_table": wandb_table
+        }
         for k, v in metric_values.items():
             global_log_dict[k] = np.average(v, weights=dataset_sizes).item()
         self.log_data(global_log_dict)
