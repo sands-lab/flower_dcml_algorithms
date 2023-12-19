@@ -49,8 +49,9 @@ def main(cfg: ParamConfig):
     evaluator = WandbEvaluation(log_to_wandb)
 
     # Create strategy
-    n_clients = 2  # int(data_config["num_clients"])
+    n_clients = int(data_config["num_clients"])
     log(INFO, f"Waiting for {n_clients} clients...")
+
     set_seed(cfg.general.seed)
     strategy = instantiate(
         cfg.fl_algorithm.strategy,

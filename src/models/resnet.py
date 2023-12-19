@@ -1,4 +1,5 @@
-import torch.nn as nn
+from torch import nn
+
 
 class ResidualBlock(nn.Module):
     def __init__(self, in_channels, out_channels, stride = 1, downsample = None):
@@ -27,7 +28,11 @@ class Resnet8(nn.Module):
     def __init__(self, n_classes) -> None:
         super().__init__()
 
-        self.initial_layer = nn.Sequential(nn.Conv2d(3, 16, 3, stride=1, padding=1), nn.ReLU(), nn.MaxPool2d(3, 1))
+        self.initial_layer = nn.Sequential(
+            nn.Conv2d(3, 16, 3, stride=1, padding=1),
+            nn.ReLU(),
+            nn.MaxPool2d(3, 1)
+        )
         self.residual_blocks = nn.ModuleList([ResidualBlock(16, 16) for _ in range(3)])
         self.avg_pooling = nn.AvgPool2d(30)
         self.classifier = nn.Linear(16, n_classes)
@@ -48,6 +53,20 @@ class Resnet8(nn.Module):
         x = self.avg_pooling(x).squeeze()
         x = self.classifier(x)
         return x
+
+
+class ResnetCombined(nn.Module):
+
+    def __init__(self, resnet8, resnet55):
+        super().__init__()
+        self.resnet8 = resnet8
+        self.resnet55 = resnet55
+
+    def forward(self, x):
+        x = self.resnet8.get_embedding(x)
+        x = self.resnet55(x)
+        return x
+
 
 class ResidualBlock3(nn.Module):
     def __init__(self, in_channels, inter_channels, out_channels, stride=1, downsample = None):

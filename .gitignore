@@ -1,7 +1,12 @@
 logs/*
 __pycache__/
-*.log
 dcgm/
 outputs/
 wandb/
 secrets.env
+
+*.log
+*.txt
+*.jpg
+*.png
+*.jpeg

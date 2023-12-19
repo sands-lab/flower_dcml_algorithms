@@ -1,10 +1,7 @@
-from flwr.server.strategy import FedAvg
-
-from fltb.decorators import MonitorFlwrStrategy
+from flwr.server.strategy import FedAvg as FlFedAvg
 
 
-@MonitorFlwrStrategy
-class FedAvg(FedAvg):
+class FedAvg(FlFedAvg):
 
     def __init__(self, n_classes, *args, **kwargs):
         super().__init__(*args, **kwargs)

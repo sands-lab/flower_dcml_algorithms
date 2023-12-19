@@ -78,3 +78,10 @@ def generate_wandb_config(cfg):
         "optimizer": cfg.local_train.optimizer,
         "seed": cfg.general.seed,
     }
+
+
+def np_softmax(matrix: np.ndarray, axis: int):
+    # using scipy implementation
+    x_max = np.amax(matrix, axis=axis, keepdims=True)
+    exp_x_shifted = np.exp(matrix - x_max)
+    return exp_x_shifted / np.sum(exp_x_shifted, axis=axis, keepdims=True)

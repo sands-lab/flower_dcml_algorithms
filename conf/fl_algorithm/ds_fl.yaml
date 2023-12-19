@@ -1,0 +1,8 @@
+client:
+  _target_: src.clients.ds_fl_client.client_fn
+strategy:
+  _target_: src.strategies.ds_fl.DS_FL
+  temperature: 0.1
+  aggregation_method: era
+  public_dataset_name: ...
+  public_dataset_size: ...

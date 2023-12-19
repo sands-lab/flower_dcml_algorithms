@@ -1,0 +1,11 @@
+client:
+  _target_: src.clients.feddf_client.client_fn
+strategy:
+  _target_: src.strategies.feddf.FedDF
+  proximal_mu: 0.01  # feddf uses a proximal term for local training as in the FedProx paper
+  public_dataset_name: cifar10
+  public_dataset_size: 2000
+  kd_temperature: 1  # in the paper they never mention the temperature
+  kd_optimizer: adam
+  kd_lr: 1e-4
+  kd_epochs: 2

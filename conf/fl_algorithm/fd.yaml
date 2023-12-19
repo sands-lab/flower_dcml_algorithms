@@ -1,4 +1,5 @@
 client:
   _target_: src.clients.fd_client.client_fn
+  kd_weight: 0.4
 strategy:
   _target_: src.strategies.fd.FD

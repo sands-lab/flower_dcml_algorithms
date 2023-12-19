@@ -1,4 +1,10 @@
 client:
   _target_: src.clients.fedgkt_client.client_fn
+  temperature: 2.0
 strategy:
   _target_: src.strategies.fedgkt.FedGKT
+  server_batch_size: 256
+  temperature: 2.0
+  server_epochs: 10
+  server_optimizer: adam
+  server_lr: 0.0008

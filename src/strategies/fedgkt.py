@@ -1,95 +1,126 @@
-from typing import Dict, List, Optional, Tuple, Union
 
 import torch
-from flwr.server.client_proxy import ClientProxy
+from torch.utils.data import TensorDataset, DataLoader
 import numpy as np
-import flwr as fl
-from flwr.common import EvaluateIns, FitIns, FitRes, Parameters, parameters_to_ndarrays
+from flwr.common import (
+    EvaluateIns,
+    FitIns,
+    Parameters,
+    parameters_to_ndarrays,
+    ndarrays_to_parameters
+)
 from flwr.server.client_manager import ClientManager
 from flwr.server.strategy import FedAvg
 
 from src.models.resnet import Resnet55
 from src.models.training_procedures import train_fedgkt_server
+from src.helper.parameters import get_parameters
+from src.strategies.commons import aggregate_fit_wrapper, get_config, sample_clients
 
-# from flwr.server.server import Server
+
 class FedGKT(FedAvg):
 
-    def __init__(self, n_classes, *args, **kwargs):
+    def __init__(self, n_classes, server_batch_size, temperature, server_epochs,
+                 server_lr, server_optimizer, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.n_classes = n_classes
         self.global_model = Resnet55(10)
+        self.server_batch_size = server_batch_size
+        self.temperature = temperature
+        self.server_epochs = server_epochs
+        self.server_lr = server_lr
+        self.server_optimizer = server_optimizer
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         assert kwargs["fraction_fit"] == 1.0, "FedGKT only supports full client participation!!"
 
     def initialize_parameters(self, client_manager: ClientManager):
         return np.empty((0,))
 
-    def configure_fit(self, server_round: int, parameters: Parameters, client_manager: ClientManager) -> List[Tuple[ClientProxy, FitIns]]:
-        config = {}
-
-        all_clients = client_manager.all()
-        all_clients = [all_clients[str(i)] for i in range(len(all_clients))]
-        print(all_clients)
+    def configure_fit(
+            self,
+            server_round: int,
+            parameters: Parameters,
+            client_manager: ClientManager
+    ):
+        config = get_config(self, server_round)
+        clients = sample_clients(self, client_manager, True)
 
         if isinstance(parameters, np.ndarray) and parameters.size == 0:
-            parameters = [parameters] * len(all_clients)
-        if self.on_fit_config_fn is not None:
-            # Custom fit config function provided
-            config = self.on_fit_config_fn(server_round)
-        # Return client/config pairs
+            parameters = [parameters] * len(clients)
 
-        return [(client, FitIns(Parameters(params, tensor_type="numpy.ndarray"), config)) for client, params in zip(all_clients, parameters)][:1]
+        return [(client, FitIns(ndarrays_to_parameters(params), config))
+                for client, params in zip(clients, parameters)]
 
-
-    def aggregate_fit(self, server_round: int, results: List[Tuple[ClientProxy, FitRes]], failures):
-        if not results:
-            return None, {}
-        # Do not aggregate if there are failures and failures are not accepted
-        if not self.accept_failures and failures:
-            return None, {}
-
-        # Convert results
-        weights_results = [
-            parameters_to_ndarrays(fit_res.parameters) for _, fit_res in results
-        ]
-        print("AGGREGATING THE FUCKING FIT")
-        embeddings = np.vstack([w[0] for w in weights_results])
-        logits = np.vstack([w[0] for w in weights_results])
-        targets = np.vstack([w[0] for w in weights_results])
-        dataset = torch.utils.data.TensorDataset(
-            torch.from_numpy(embeddings),
-            torch.from_numpy(logits),
-            torch.from_numpy(targets)
-        )
-        trainloader = torch.utils.data.DataLoader(dataset, batch_size=32, shuffle=True)
-        train_fedgkt_server(self.global_model, trainloader, "adam", 1, 0.1, self.device)
-
-        # we compute the new logits outside of the training loop (for ease of implementation)
-        new_logits = []
-        for embeddings, _, _ in weights_results:
-            client_logits = []
-            for e in embeddings:
-                e = torch.from_numpy(e).to(self.device).unsqueeze(0)
+    def _get_new_client_logits(self, datasets):
+        output_client_logits = []
+        for dataset in datasets:
+            dataloader = DataLoader(dataset, batch_size=32, shuffle=False)
+            output_client_logits.append([])
+            for embeddings, _, _ in dataloader:
                 with torch.no_grad():
-                    logit = self.global_model(e)
-                client_logits.append(logit.cpu().numpy())
-            client_logits = np.vstack(client_logits)
-            new_logits.append(client_logits)
-        new_logits = np.vstack(new_logits)
-        print(new_logits.shape)
-        print("AGGREGATED THE FUCKING FIT!!")
-        import sys
-        sys.exit(0)
+                    embeddings = embeddings.to(self.device)
+                    output_client_logits[-1].append(
+                        self.global_model(embeddings).reshape(-1, self.n_classes).cpu().numpy()
+                    )
+            output_client_logits[-1] = np.vstack(output_client_logits[-1])
+            print(output_client_logits[-1].shape)
+        return output_client_logits
 
-        # Aggregate custom metrics if aggregation fn was provided
-        metrics_aggregated = {}
-        if self.fit_metrics_aggregation_fn:
-            fit_metrics = [(res.num_examples, res.metrics) for _, res in results]
-            metrics_aggregated = self.fit_metrics_aggregation_fn(fit_metrics)
+    @aggregate_fit_wrapper
+    def aggregate_fit(self, server_round: int, results, failures):
 
-        return None, metrics_aggregated
+        # Convert results - NOTE: results are not guaranteed to be sorted, need to sort them in code
+        weights_results = {
+            int(client_proxy.cid): parameters_to_ndarrays(fit_res.parameters)
+            for client_proxy, fit_res in results
+        }
 
-    def configure_evaluate(self, server_round: int, parameters: Parameters, client_manager: ClientManager) -> List[Tuple[ClientProxy, EvaluateIns]]:
-        print("evaluating....")
-        import sys
-        sys.exit(0)
+        datasets = [TensorDataset(
+            *[torch.from_numpy(c) for c in weights_results[idx]]
+        ) for idx in range(len(weights_results))]
+
+        # why do we not concatenate all the parameters into a single dataset, so that
+        # we can shuffle data points of different clients?
+        dataloaders = [
+            DataLoader(ds, batch_size=self.server_batch_size, shuffle=True) for ds in datasets
+        ]
+        train_fedgkt_server(
+            model=self.global_model,
+            dataloaders=dataloaders,
+            optimizer_name=self.server_optimizer,
+            epochs=self.server_epochs,
+            lr=self.server_lr,
+            device=self.device,
+            temperature=self.temperature
+        )
+
+        # do this out of the training loop so we don't need to add to the TensorDataset index-data
+        # it should not change the results too much (intuitively, it should improve the results)
+        output_client_logits = self._get_new_client_logits(datasets)
+
+        return output_client_logits
+
+    def configure_evaluate(
+        self, server_round: int, parameters: Parameters, client_manager: ClientManager
+    ):
+        """Configure the next round of evaluation."""
+
+        # Parameters and config
+        config = {}
+        if self.on_evaluate_config_fn is not None:
+            # Custom evaluation config function provided
+            config = self.on_evaluate_config_fn(server_round)
+
+        server_model_params = ndarrays_to_parameters(get_parameters(self.global_model))
+        evaluate_ins = EvaluateIns(server_model_params, config)
+
+        # Sample clients
+        sample_size, min_num_clients = self.num_evaluation_clients(
+            client_manager.num_available()
+        )
+        clients = client_manager.sample(
+            num_clients=sample_size, min_num_clients=min_num_clients
+        )
+
+        # Return client/config pairs
+        return [(client, evaluate_ins) for client in clients]

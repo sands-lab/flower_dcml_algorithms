@@ -3,31 +3,25 @@ import numpy as np
 import torch
 
 from src.models.helper import construct_matrix
+from src.models.utils import KLLoss
+from src.helper.optimization_config import OptimizationConfig, init_optimizer
 
 
-def _iterate_dataloader(dataloader, epochs, device):
-    for _ in range(epochs):
-        for data in dataloader:
-            data = [d.to(device) for d in data]
+def _iterate_dataloader(optimization_config: OptimizationConfig):
+    for _ in range(optimization_config.epochs):
+        for data in optimization_config.dataloader:
+            data = [d.to(optimization_config.device) for d in data]
             yield data
 
 
-def init_optimizer(model, optimizer_name, lr):
-    if optimizer_name == "adam":
-        optimizer = torch.optim.Adam(model.parameters(), lr=lr)
-    elif optimizer_name == "sgd":
-        optimizer = torch.optim.SGD(model.parameters(), lr=lr)
-    else:
-        raise Exception(f"Optimizer {optimizer_name} is not allowed")
-    return optimizer
+def train(optimization_config: OptimizationConfig):
 
-def train(model, dataloader, optimizer_name, epochs, lr, device):
+    model = optimization_config.model
+    optimizer = optimization_config.optimizer
 
-    model.train()
-    optimizer = init_optimizer(model, optimizer_name, lr)
     criterion = torch.nn.CrossEntropyLoss()
 
-    for data, targets in _iterate_dataloader(dataloader, epochs, device):
+    for data, targets in _iterate_dataloader(optimization_config):
 
         preds = model(data)
         loss = criterion(preds, targets)
@@ -37,12 +31,14 @@ def train(model, dataloader, optimizer_name, epochs, lr, device):
         optimizer.step()
 
 
-def train_fpx(model, dataloader, optimizer_name, epochs, lr, device, global_model, mu):
-    model.train()
-    optimizer = init_optimizer(model, optimizer_name, lr)
+def train_fpx(optimization_config: OptimizationConfig, global_model, mu):
+
+    model = optimization_config.model
+    optimizer = optimization_config.optimizer
+
     criterion = torch.nn.CrossEntropyLoss()
 
-    for data, targets in _iterate_dataloader(dataloader, epochs, device):
+    for data, targets in _iterate_dataloader(optimization_config):
         preds = model(data)
         loss = criterion(preds, targets)
 
@@ -56,88 +52,166 @@ def train_fpx(model, dataloader, optimizer_name, epochs, lr, device, global_mode
         optimizer.step()
 
 
-def train_fd(model, dataloader, optimizer_name, epochs, lr, device, kd_weight, logit_matrix):
-    assert isinstance(logit_matrix, torch.Tensor)
-    num_classes = logit_matrix.shape[0]
-    assert logit_matrix.ndim() == 2
-    assert num_classes == logit_matrix.shape[1] == model.modules[-1].out_features
+def train_fd(optimization_config: OptimizationConfig, kd_weight, logit_matrix, num_classes):
 
-    model.train()
-    logit_matrix = logit_matrix.to(device)
-    optimizer = init_optimizer(model, optimizer_name, lr)
+    model = optimization_config.model
+    optimizer = optimization_config.optimizer
     criterion = torch.nn.CrossEntropyLoss()
 
-    cnts = torch.zeros((num_classes,))
-    running_sums = torch.zeros((num_classes, num_classes))
+    # sanity checks
+    assert isinstance(logit_matrix, torch.Tensor)
+    assert logit_matrix.ndim == 2 or logit_matrix.numel() == 0
 
-    for data, targets in _iterate_dataloader(dataloader, epochs, device):
+    empty_logit_matrix = logit_matrix.ndim == 1
+    logit_matrix = logit_matrix.to(optimization_config.device)
+    cnts = torch.zeros((num_classes,)).to(optimization_config.device)
+    running_sums = torch.zeros((num_classes, num_classes)).to(optimization_config.device)
+
+    for data, targets in _iterate_dataloader(optimization_config):
         preds = model(data)
-        ce_loss = criterion(preds, targets)
-        kd_loss = kd_weight * criterion(preds, logit_matrix[targets])
-        loss = ce_loss + kd_loss
+        loss = criterion(preds, targets)
+        if not empty_logit_matrix:
+            # CrossEntropyLoss performs softmax internally, so no need to call the softmax here
+            loss += kd_weight * criterion(preds, logit_matrix[targets])
 
         model.zero_grad()
         loss.backward()
         optimizer.step()
 
-        cnts += torch.bincount(input, minlength=num_classes)
+        cnts += torch.bincount(targets, minlength=num_classes)
+        preds = torch.nn.functional.softmax(preds, dim=1)
         running_sums += construct_matrix(preds, targets, num_classes)
     running_sums /= cnts
+    running_sums = running_sums.cpu().numpy()
     return running_sums
 
 
-def train_fedgkt_client(model, dataloader, optimizer_name, epochs, lr, device):
-    model.train()
-    optimizer = init_optimizer(model, optimizer_name, lr)
-    criterion = torch.nn.CrossEntropyLoss()
+# pylint: disable=C0103
+def train_fedgkt_client(optimization_config: OptimizationConfig, temperature):
+    model = optimization_config.model
+    optimizer = optimization_config.optimizer
+
+    criterion_ce = torch.nn.CrossEntropyLoss()
+    criterion_kl = KLLoss(temperature)
 
     # train model
-    for data in _iterate_dataloader(dataloader, epochs, device):
+    for data in _iterate_dataloader(optimization_config):
         if len(data) == 2:
             data, targets = data
+            server_logits = None
         elif len(data) == 3:
-            data, targets, logits = data
+            data, targets, server_logits = data
 
         preds = model(data)
-        ce_loss = criterion(preds, targets)
+        loss = criterion_ce(preds, targets)
+        if server_logits is not None:
+            loss += criterion_kl(preds, server_logits)
 
-        loss = ce_loss
         model.zero_grad()
         loss.backward()
         optimizer.step()
 
     # extract features and logits
+    ordered_dataloader = torch.utils.data.DataLoader(optimization_config.dataloader.dataset,
+                                                     shuffle=False, batch_size=32, drop_last=False)
     H_k, Z_k, Y_k = [], [], []
-    for idx in range(len(dataloader.dataset)):
-        data = dataloader.dataset[idx]
+    for data in ordered_dataloader:
+        data = [d.to(optimization_config.device) for d in data]
         if len(data) == 2:
-            data, y = data
+            data, targets = data
         else:
-            data, y, _ = data
-        data = data.to(device).unsqueeze(0)
+            data, targets, _ = data
         with torch.no_grad():
             hk = model.get_embedding(data)
             zk = model.get_predictions(hk)
 
         H_k.append(hk.cpu().numpy())
         Z_k.append(zk.cpu().numpy())
-        Y_k.append(y)
+        Y_k.append(targets.detach().cpu().numpy())
     H_k = np.vstack(H_k)
     Z_k = np.vstack(Z_k)
-    Y_k = np.vstack(Y_k)
+    Y_k = np.hstack(Y_k)
     print(H_k.shape)
     return H_k, Z_k, Y_k
 
 
-def train_fedgkt_server(model, dataloader, optimizer_name, epochs, lr, device):
+def train_fedgkt_server(model, dataloaders, optimizer_name, epochs, lr, device, temperature):
     model.train()
     model.to(device)
+    print(f"Server training on {device}")
+    criterion_ce = torch.nn.CrossEntropyLoss()
+    criterion_kl = KLLoss(temperature)
 
     optimizer = init_optimizer(model, optimizer_name, lr)
-    for embeddings, logits, targets in _iterate_dataloader(dataloader, epochs, device):
-        pred_logits = model(embeddings)
+    for i in range(epochs):
+        print(f"Epoch {i}")
+        train_order = np.random.permutation(len(dataloaders))
+        for cid in train_order:
+            print(f"Client {cid}")
+            dataloader = dataloaders[cid]
+
+            for _ in range(epochs):
+                for data in dataloader:
+                    data = [d.to(device) for d in data]
+                    embeddings, logits, targets = data
+
+                    pred_logits = model(embeddings)
+
+                    ce_loss = criterion_ce(pred_logits, targets)
+                    kl_loss = criterion_kl(pred_logits, logits)
+                    loss = ce_loss + kl_loss
+
+                    model.zero_grad()
+                    loss.backward()
+                    optimizer.step()
+
+
+def train_kd_ds_fl(optimization_config: OptimizationConfig):
+    model = optimization_config.model
+    optimizer = optimization_config.optimizer
+
+    criterion = KLLoss(2.0)  # which loss function should be used?
+
+    for images, target_logits in _iterate_dataloader(optimization_config):
+        pred_logits = model(images)
+
+        loss = criterion(pred_logits, target_logits)
 
         model.zero_grad()
         loss.backward()
         optimizer.step()
 
+
+def train_feddf(optimization_config: OptimizationConfig, temperature, teacher_models):
+    # model is the student (server) model
+    # train with AVGLOGITS (page 3 in the paper)
+
+    model = optimization_config.model
+    optimizer = optimization_config.optimizer
+
+    for model in teacher_models:
+        model.eval()
+        model.to(optimization_config.device)
+
+    criterion = KLLoss(temperature)
+
+    for _ in range(optimization_config.epochs):
+        for images in optimization_config.dataloader:
+            images = images.to(optimization_config.device)
+
+            teacher_predictions = []
+            with torch.no_grad():
+                for teacher_model in teacher_models:
+                    teacher_predictions.append(
+                        teacher_model(images).unsqueeze(0)
+                    )
+            teacher_predictions = torch.mean(
+                torch.vstack(teacher_predictions), axis=0
+            )
+            student_predictions = model(images)
+
+            loss = criterion(student_predictions, teacher_predictions)
+
+            model.zero_grad()
+            loss.backward()
+            optimizer.step()

@@ -1,37 +1,33 @@
-import os
-
-import flwr as fl
+import numpy as np
 import torch
 
+from src.models.evaluation_procedures import test_accuracy
 from src.models.training_procedures import train_fd
 from src.clients.base_client import BaseClient
 
 
 class FDClient(BaseClient):
 
-    def __init__(self, idx, images_folder, partition_folder, seed, experiment_folder):
-        super().__init__(idx, images_folder, partition_folder, seed, experiment_folder)
-        self.model_save_file = f"{self.client_working_folder}/model.pth"
-        if not os.path.isfile(self.model_save_file):
-            torch.save(self.model.state_dict(), self.model_save_file)
-
-    def set_parameters(self, model, parameters):
-        self.model.load_state_dict(torch.load(self.model_save_file))
+    def __init__(self, kd_weight, eval_after_train, **kwargs):
+        super().__init__(**kwargs, stateful_client=True)
+        self.kd_weight = kd_weight
+        self.eval_after_train = eval_after_train
 
     def fit(self, parameters, config):
         trainloader = self._init_dataloader(train=True, batch_size=config["batch_size"])
-        self.set_parameters(self.model, None)
 
+        assert len(parameters) == 1 and isinstance(parameters[0], np.ndarray)
+        parameters = torch.from_numpy(parameters[0])
         logits_matrix = train_fd(
-            model=self.model,
-            dataloader=trainloader,
-            optimizer_name=config["optimizer"],
-            epochs=config["local_epochs"],
-            lr=config["lr"],
-            device=self.device
+            optimization_config=self.get_optimization_config(trainloader, config),
+            kd_weight=self.kd_weight,
+            logit_matrix=parameters,
+            num_classes=self.n_classes
         )
-        torch.save(self.model.state_dict(), self.model_save_file)
-        return fl.common.ndarrays_to_parameters(logits_matrix), len(trainloader.dataset), {}
+        self.save_model_to_disk()
 
-def client_fn(cid, images_folder, partition_folder) -> FDClient:
-    return FDClient(int(cid), images_folder, partition_folder)
+        return [logits_matrix], len(trainloader.dataset), {}
+
+
+def client_fn(cid, **kwargs) -> FDClient:
+    return FDClient(cid=int(cid), **kwargs)

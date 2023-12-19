@@ -1,0 +1,4 @@
+client:
+  _target_: src.clients.private_training_client.client_fn
+strategy:
+  _target_: src.strategies.private_training.PrivateTrainer

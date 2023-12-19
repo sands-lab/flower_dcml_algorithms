@@ -8,8 +8,6 @@ from hydra.core.config_store import ConfigStore
 from hydra.utils import instantiate
 from dotenv import load_dotenv
 
-from src.helper.commons import load_data_config
-
 
 cs = ConfigStore.instance()
 cs.store(name="config", node=ParamConfig)

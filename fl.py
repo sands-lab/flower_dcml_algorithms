@@ -1,10 +1,12 @@
 import os
+import json
 import tempfile
 from functools import partial
 
+import torch
 import flwr as fl
 import hydra
-from hydra.core.config_store import ConfigStore
+from hydra.core.config_store import ConfigStore, OmegaConf
 from hydra.utils import instantiate
 import wandb
 from dotenv import load_dotenv
@@ -12,6 +14,7 @@ from dotenv import load_dotenv
 from conf.config_schema import ParamConfig
 from src.helper.evaluation import WandbEvaluation
 from src.helper.fl_helper import construct_config_fn
+from src.helper.model_heterogeneity import inject_model_capacity, init_client_id_to_capacity_mapping
 from src.helper.commons import set_seed, load_data_config, generate_wandb_config
 
 cs = ConfigStore.instance()
@@ -24,7 +27,8 @@ def run(cfg: ParamConfig):
 
     data_home_folder = os.environ.get("FLTB_DATA_HOME_FOLDER")
     partitions_home_folder = "./data/partitions"
-    partition_folder = f"{partitions_home_folder}/{partition_folder}"
+    partition_folder = \
+        f"{partitions_home_folder}/{cfg.data.dataset}/{cfg.data.partitioning_configuration}"
 
     data_config = load_data_config(partition_folder)
     n_classes = {
@@ -32,24 +36,33 @@ def run(cfg: ParamConfig):
         "mnist": 10
     }[data_config["dataset_name"]]
 
-    wandb_config_dict = generate_wandb_config(cfg) | data_config
-    # wandb.init(
-    #     project="test-project",
-    #     config=wandb_config_dict
-    # )
-    # evaluator = WandbEvaluation()
+    print(os.environ.get("LOG_TO_WANDB"))
+    log_to_wandb = bool(int(os.environ.get("LOG_TO_WANDB")))
+    print(log_to_wandb)
+    fl_algorithm_name = cfg.fl_algorithm.strategy._target_.split(".")[-1]
+
+    if log_to_wandb:
+        print("Logging to wandb...")
+        wandb_config_dict = generate_wandb_config(cfg) | data_config
+        wandb.init(
+            config=wandb_config_dict,
+            name=fl_algorithm_name
+        )
+    evaluator = WandbEvaluation(log_to_wandb)
 
     # Create strategy
+    set_seed(cfg.general.seed)
     strategy = instantiate(
         cfg.fl_algorithm.strategy,
         n_classes=n_classes,
-        fraction_fit=cfg.global_train.fraction_fit,  # Sample 100% of available clients for training
-        fraction_evaluate=cfg.global_train.fraction_eval,  # Sample 50% of available clients for evaluation
-        min_fit_clients=1,  # Never sample less than 10 clients for training
-        min_evaluate_clients=1,  # Never sample less than 5 clients for evaluation
-        min_available_clients=1,  # Wait until all 10 clients are available
-        # evaluate_metrics_aggregation_fn=evaluator.evaluate,
-        on_fit_config_fn=construct_config_fn(cfg.local_train)
+        fraction_fit=cfg.global_train.fraction_fit,
+        fraction_evaluate=cfg.global_train.fraction_eval,
+        min_fit_clients=1,
+        min_evaluate_clients=1,
+        min_available_clients=1,
+        evaluate_metrics_aggregation_fn=evaluator.eval_aggregation_fn,
+        fit_metrics_aggregation_fn=evaluator.fit_aggregation_fn,
+        on_fit_config_fn=construct_config_fn(OmegaConf.to_container(cfg.local_train))
     )
 
     with tempfile.TemporaryDirectory(dir="data/client") as temp_dir:
@@ -57,13 +70,34 @@ def run(cfg: ParamConfig):
         print(f"Temporary directory created: {temp_dir}")
 
         client_fn = instantiate(cfg.fl_algorithm.client, _partial_=True)
-        client_resources = {"num_gpus": 1, "num_cpus": 1}
-        client_fn_ = partial(client_fn,
-                            images_folder=f"{data_home_folder}/{data_config['dataset_name']}",
-                            partition_folder=partition_folder, seed=cfg.general.seed,
-                            experiment_folder=temp_dir)
 
-        set_seed(cfg.general.seed)
+        client_resources = {"num_gpus": 1, "num_cpus": 1}
+        common_kwargs = {
+            "images_folder": f"{data_home_folder}/{data_config['dataset_name']}",
+            "partition_folder": partition_folder,
+            "seed": cfg.general.seed,
+            "experiment_folder": temp_dir
+        }
+        if strategy.__class__.__name__ in {"FedAvg", "FedProx"}:
+            # these are the only strategies in which all the clients have the
+            # very same model architecture the model capacity should be set in
+            # the config file rather than being injected by the runtime
+            client_fn_ = partial(client_fn, **common_kwargs)
+        else:
+            random_client_capacities = \
+                init_client_id_to_capacity_mapping(data_config["num_clients"], 2)
+            client_id_to_capacity_mapping_file = f"{temp_dir}/model_capacities.json"
+            with open(client_id_to_capacity_mapping_file, "w") as fp:
+                json.dump(random_client_capacities, fp)
+
+            if strategy.__class__.__name__ in {"FedDF"}:
+                strategy.set_client_capacity_mapping(client_id_to_capacity_mapping_file)
+
+            client_fn_ = partial(inject_model_capacity,
+                                 client_fn=client_fn,
+                                 client_capacities=random_client_capacities,
+                                 **common_kwargs)
+
         fl.simulation.start_simulation(
             client_fn=client_fn_,
             num_clients=data_config["num_clients"],
@@ -71,9 +105,14 @@ def run(cfg: ParamConfig):
             strategy=strategy,
             client_resources=client_resources,
         )
-    # wandb.finish()
+
+    if log_to_wandb:
+        wandb.finish()
 
 
 if __name__ == "__main__":
-    load_dotenv()
+    torch.backends.cudnn.deterministic = True
+    torch.backends.cudnn.benchmark = False
+    load_dotenv(override=True)
+    load_dotenv("secrets.env", override=True)
     run()

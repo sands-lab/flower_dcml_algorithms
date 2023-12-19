@@ -1,0 +1,8 @@
+client:
+  _target_: src.clients.fedmd_client.client_fn
+  pretrain_epochs: 3
+  kd_epochs: 2
+strategy:
+  _target_: src.strategies.fedmd.FedMD
+  public_dataset: cifar10
+  size_public_dataset_sample: 5000

@@ -69,3 +69,101 @@ In order to run the experiment on docker, use the following commands:
 docker build -t fl_base_image .
 docker run -it --rm -v ./data/raw/:/app/data/raw fl_base_image
 ```
+
+
+## Algorihtms
+
+Currently the following algorithms are implemented:
+
+#### Private training
+
+Simulation of the accuracy achieved if every client trained independently on its own dataset:
+
+```bash
+python fl.py fl_algorithm=private_training
+```
+
+*Comments*: this procedure is still implemented in Flower. This means, that at every epoch a sample of clients are sampled and trained with the parameters set in `base_config.yaml`.
+
+#### FedAvg
+
+```bash
+python fl.py fl_algorithm=fedavg
+```
+
+*Comments*: state which model architecture (by means of the `client_capacity` parameter) in the `fedavg.yaml` file.
+
+
+#### FedProx
+
+```bash
+python fl.py fl_algorithm=fedprox
+```
+
+*Comments*: Set the regularization strength and the model architecture in the `fedprox.yaml` file.
+
+
+#### FD
+
+Implementation of the algorihtm proposed `Communication-Efficient On-Device Machine Learning: Federated Distillation and Augmentation under Non-IID Private Data`.
+
+```bash
+python fl.py fl_algorithm=fedprox
+```
+
+*Comments*: Set the regularization strength in the `fedprox.yaml` file.
+
+### Work in progress
+
+#### FedMD
+
+Implementation of the algorithm proposed in `FedMD: Heterogenous Federated Learning via Model Distillation`
+
+```bash
+python fl.py fl_algorithm=fedmd
+```
+
+*Comments*: Paper lacks a lot of details regarding the implementation. For instance:
+
+- it is not stated which loss function is used for distilling knowledge. The authors only state that `the models communicate and align their logits computed from public data without applying the softmax activation layer`. In the implementation, I decided to use MSE loss.
+- it is not described how to switch from the pre-trained model to the actual model of interest. This is something that still needs to be implemented in our code.
+- **We should drop this algorithm!!**
+
+
+#### DS-FL
+
+Implementation of `Distillation-Based Semi-Supervised Federated Learning for Communication-Efficient Collaborative Training With Non-IID Private Data`
+
+```bash
+python fl.py fl_algorithm=ds_fl
+```
+
+*Comments*:
+
+- In the paper, it seems that every clients needs to participate in every training epoch (double check this). In the implementation, we support partial client participation;
+- TO-DO: Currently, the clients do not share the index set of the data points for the next training epoch. Instead, the whole public dataset is exchanged at every training epoch.
+
+
+## Logging data to W&B
+
+To log the data to wandb you need to:
+
+- Set the environment variable `LOG_TO_WANDB` to `1`;
+- Create a `secrets.env` file with the following structure:
+
+```bash
+WANDB_API_KEY=<fill your value>
+WANDB_USERNAME=<fill your value>
+WANDB_ENTITY=<fill your value>
+WANDB_PROJECT=<fill your value>
+```
+
+
+
+## TO-DOs
+
+- Check all the algorithms implemented so far for correctness;
+- Correct FedGKT;
+- Try to reproduce some results;
+- Next implement: FedKD, HeteroFL/FjORD, FedRolex, Federated Dropout, FedRecon;
+- Run experiment on testbed.

@@ -97,14 +97,15 @@ def download_data(data_home_folder, dataset_name):
 
 
 def _save_configs(trainsets, testsets, save_folder):
-    for partition_idx, (partition_train_df, partition_test_df) in enumerate(zip(trainsets, testsets)):
-        save_train_file = f"{save_folder}/partition_{partition_idx}_train.csv"
-        save_test_file = f"{save_folder}/partition_{partition_idx}_test.csv"
+    for idx, (partition_train_df, partition_test_df) in enumerate(zip(trainsets, testsets)):
+        save_train_file = f"{save_folder}/partition_{idx}_train.csv"
+        save_test_file = f"{save_folder}/partition_{idx}_test.csv"
         partition_train_df.to_csv(save_train_file, index=False)
         partition_test_df.to_csv(save_test_file, index=False)
 
 
-def _generate_dirichlet_partition(raw_data_folder, partitions_home_folder, dataset_name, num_clients, seed, test_percentage, min_size_of_dataset, alpha):
+def _generate_dirichlet_partition(raw_data_folder, partitions_home_folder, dataset_name,
+                                  num_clients, seed, test_percentage, min_size_of_dataset, alpha):
 
     df = pd.read_csv(f"{raw_data_folder}/{dataset_name}/metadata.csv")
     df["idx"] = df["filename"].str.split(".").str[0].astype(int)
@@ -114,7 +115,8 @@ def _generate_dirichlet_partition(raw_data_folder, partitions_home_folder, datas
                               min_size_of_dataset=min_size_of_dataset,
                               alpha_value=alpha)
     partition_folder = f"{partitions_home_folder}/{dataset_name}/"\
-                       f"dirichlet_{num_clients}clients_{seed}seed_{alpha}alpha_{test_percentage}test"
+                       f"dirichlet_{num_clients}clients_{seed}seed"\
+                       f"_{alpha}alpha_{test_percentage}test"
     if os.path.exists(partition_folder):
         print("Partitioning exists already. Returning...")
         return partition_folder
@@ -133,7 +135,8 @@ def _generate_dirichlet_partition(raw_data_folder, partitions_home_folder, datas
     return partition_folder
 
 
-def _generate_shards_partition(raw_data_folder, partitions_home_folder, dataset_name, num_clients, test_percentage, seed):
+def _generate_shards_partition(raw_data_folder, partitions_home_folder,
+                               dataset_name, num_clients, test_percentage, seed):
     df = pd.read_csv(f"{raw_data_folder}/{dataset_name}/metadata.csv")
 
     shards = []
@@ -152,13 +155,16 @@ def _generate_shards_partition(raw_data_folder, partitions_home_folder, dataset_
     idxs_list = torch.randperm(
         num_clients * 2, generator=torch.Generator().manual_seed(seed)
     ).numpy()
-    datasets = [np.hstack([shards[idxs_list[i*2]], shards[idxs_list[i*2+1]]]) for i in range(0, num_clients)]
+    datasets = [
+        np.hstack([shards[idxs_list[i*2]], shards[idxs_list[i*2+1]]]) for i in range(0, num_clients)
+    ]
 
     # randomly split in train and test set
     trainsets, testsets = [], []
     testset_size = int(shard_size * test_percentage)
     for i, ds in enumerate(datasets):
-        permuted_idxs = ds[torch.randperm(len(ds), generator=torch.Generator().manual_seed(i + seed)).numpy()]
+        permuted_idxs = \
+            ds[torch.randperm(len(ds), generator=torch.Generator().manual_seed(i + seed)).numpy()]
         testsets.append(df.iloc[permuted_idxs[:testset_size]])
         trainsets.append(df.iloc[permuted_idxs[testset_size:]])
     _save_configs(trainsets, testsets, partition_folder)
