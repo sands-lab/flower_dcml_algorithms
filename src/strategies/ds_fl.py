@@ -22,7 +22,7 @@ from src.helper.commons import np_softmax
 class DS_FL(FedAvg):
 
     def __init__(self, n_classes, temperature, aggregation_method, public_dataset_name,
-                 public_dataset_size, *args, **kwargs):
+                 public_dataset_size, public_dataset_csv, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.n_classes = n_classes
         assert aggregation_method in {"era", "sa"}
@@ -30,18 +30,22 @@ class DS_FL(FedAvg):
         self.aggregation_method = aggregation_method
         self.temperature = temperature
         self.public_dataset_params = ndarrays_to_parameters(
-            self._load_public_dataset(public_dataset_name, public_dataset_size)
+            self._load_public_dataset(public_dataset_name, public_dataset_size, public_dataset_csv)
         )
-        self.initialized_clients = set()  # in the paper the
+        self.initialized_clients = set()  # track which clients have received public dataset
 
     def initialize_parameters(self, client_manager: ClientManager):
         return ndarrays_to_parameters([np.empty((0,))])
 
-    def _load_public_dataset(self, dataset_name, dataset_size):
+    def _load_public_dataset(self, dataset_name, dataset_size, public_dataset_csv):
         public_dataset_home_folder = \
             os.path.join(os.environ.get("FLTB_DATA_HOME_FOLDER"), dataset_name)
-        sampled_data = pd.read_csv(f"{public_dataset_home_folder}/metadata.csv")\
-            .sample(n=dataset_size, replace=False, random_state=10, axis=0)
+        if public_dataset_csv is None:
+            sampled_data = pd.read_csv(f"{public_dataset_home_folder}/metadata.csv")\
+                .sample(n=dataset_size, replace=False, random_state=10, axis=0)
+        else:
+            sampled_data = pd.read_csv(public_dataset_csv)
+
         images = []
         for _, row in sampled_data.iterrows():
             image = Image.open(os.path.join(public_dataset_home_folder, row["filename"]))
@@ -49,8 +53,6 @@ class DS_FL(FedAvg):
             image_np = image_tensor.numpy()[None,:,:,:]
             images.append(image_np)
         images = np.vstack(images)
-        print(f"Server: {type(images)}")
-        print(f"Server: {len(images)}")
         return [images]
 
     def _aggregate_era(self, client_logits):

@@ -16,7 +16,6 @@ class FedProxClient(BaseClient):
         self.set_parameters(self.model, parameters)
         global_model = copy.deepcopy(self.model)
 
-        print(config)
         train_fpx(
             optimization_config=self.get_optimization_config(trainloader, config),
             global_model=global_model,

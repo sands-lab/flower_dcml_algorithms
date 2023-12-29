@@ -1,0 +1,5 @@
+client:
+  _target_: src.clients.lg_fedavg_client.LgFedAvgClient
+  n_public_layers: 2
+strategy:
+  _target_: src.strategies.lg_fedavg.LgFedAvg

@@ -1,0 +1,10 @@
+{
+    "cifar10": {
+        "0": "src.models.convnet.LeNet5",
+        "1": "src.models.convnet.ConvNet"
+    },
+    "mnist": {
+        "0": "src.models.convnet.DS_FL_ConvNet",
+        "1": "src.models.convnet.DS_FL_ConvNet"
+    }
+}

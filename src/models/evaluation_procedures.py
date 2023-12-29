@@ -3,6 +3,7 @@ import torch
 
 def test_accuracy(model, dataloader, device):
     model.eval()
+    model = model.to(device)
     correct_predictions = 0
     for images, targets in dataloader:
         images, targets = images.to(device), targets.to(device)

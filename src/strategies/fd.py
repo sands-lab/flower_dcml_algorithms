@@ -3,8 +3,7 @@ from flwr.common import (
     Parameters,
     ndarrays_to_parameters,
     parameters_to_ndarrays,
-    FitIns,
-    bytes_to_ndarray
+    FitIns
 )
 from flwr.server.client_manager import ClientManager
 from flwr.server.strategy import FedAvg
@@ -40,7 +39,7 @@ class FD(FedAvg):
             fit_ins = [FitIns(parameters, config)] * len(clients)
         else:
             fit_ins = [
-                FitIns(ndarrays_to_parameters(bytes_to_ndarray(parameters.tensors[i])), config)
+                FitIns(ndarrays_to_parameters([params_np[i]]), config)
                 for i in range(len(clients))
             ]
 
@@ -50,18 +49,28 @@ class FD(FedAvg):
     @aggregate_fit_wrapper
     def aggregate_fit(self, server_round, results, failures):
         summed_logits = np.zeros((self.n_classes, self.n_classes))
-        client_logits = {
+        received_client_data = {
             client_proxy.cid: parameters_to_ndarrays(fit_res.parameters)
             for client_proxy, fit_res in results
         }
-        sorted_logits = [client_logits[str(i)] for i in range(len(client_logits))]
-        for logits in sorted_logits:
-            assert len(logits) == 1
-            summed_logits += logits[0]
+
+        client_logits, client_labels = [], []
+        for i in range(len(received_client_data)):
+            client_data = received_client_data[str(i)]
+            logits, labels = client_data[0], client_data[1]
+            expanded_logits = np.zeros((self.n_classes, self.n_classes), dtype=np.float32)
+            expanded_logits[labels] = logits
+
+            client_logits.append(expanded_logits)
+            client_labels.append(labels.astype(np.int32).reshape(1, -1))
+        client_labels = np.vstack(client_labels)
+        summed_logits = np.sum(client_logits, axis=0)
 
         new_client_logits = []
-        for logits in sorted_logits:
-            tmp = (summed_logits - logits) / (len(sorted_logits) - 1)
+        for idx, logits in enumerate(client_logits):
+            n_clients_with_labels = \
+                np.delete(client_labels, idx, axis=0).sum(axis=0).reshape(-1, 1)
+            tmp = (summed_logits - logits) / n_clients_with_labels
             new_client_logits.append(tmp)
         logits_parameters = ndarrays_to_parameters(new_client_logits)
 

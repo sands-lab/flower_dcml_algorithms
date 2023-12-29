@@ -7,25 +7,27 @@ from src.clients.base_client import BaseClient
 
 class FDClient(BaseClient):
 
-    def __init__(self, kd_weight, eval_after_train, **kwargs):
+    def __init__(self, kd_weight, temperature, **kwargs):
         super().__init__(**kwargs, stateful_client=True)
         self.kd_weight = kd_weight
-        self.eval_after_train = eval_after_train
+        self.temperature = temperature
 
     def fit(self, parameters, config):
         trainloader = self._init_dataloader(train=True, batch_size=config["batch_size"])
 
         assert len(parameters) == 1 and isinstance(parameters[0], np.ndarray)
+        assert parameters[0].shape == (self.n_classes, self.n_classes) or parameters[0].size == 0
         parameters = torch.from_numpy(parameters[0])
         logits_matrix = train_fd(
             optimization_config=self.get_optimization_config(trainloader, config),
             kd_weight=self.kd_weight,
             logit_matrix=parameters,
-            num_classes=self.n_classes
+            num_classes=self.n_classes,
+            temperature=self.temperature
         )
         self.save_model_to_disk()
 
-        return [logits_matrix], len(trainloader.dataset), {}
+        return logits_matrix, len(trainloader.dataset), {}
 
 
 def client_fn(cid, **kwargs) -> FDClient:

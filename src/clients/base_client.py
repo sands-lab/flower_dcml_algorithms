@@ -57,11 +57,16 @@ class BaseClient(fl.client.NumPyClient):
             set_parameters(model, parameters)
 
     def _init_model(self):
-        self.model = init_model(self.client_capacity, self.n_classes, self.device)
+        self.model = init_model(
+            client_capacity=self.client_capacity,
+            n_classes=self.n_classes,
+            device=self.device,
+            dataset=self.dataset_name
+        )
 
         if self.stateful_client:
             try:
-                self.model.load_state_dict(torch.load(self.model_save_file))
+                self.model.load_state_dict(torch.load(self.model_save_file), strict=True)
             except:
                 self.save_model_to_disk()  # actually, we might not need this
 

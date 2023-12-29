@@ -31,7 +31,6 @@ def configure_evaluate_no_params(
 
 def aggregate_fit_wrapper(func):
     def wrapper(_self, server_round, results, failures):
-        print("here ok")
         if not results:
             return None, {}
         # Do not aggregate if there are failures and failures are not accepted

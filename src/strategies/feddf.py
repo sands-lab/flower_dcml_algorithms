@@ -42,10 +42,19 @@ class FedDF(FedProx):
         self.kd_lr = kd_lr
         self.kd_epochs = kd_epochs
         self.device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+        self.dataset_name = None
+        # in a given epoch, a given model capacity might not be represented.
+        # therefore, we need to store the models as attributes so that we can retrieve
+        # the latest version if this happens. We initialize the model_arrays to None,
+        # its value will be set in self.initialize_parameters(...)
+        self.model_arrays = None
+
+    def set_dataset_name(self, dataset_name):
+        self.dataset_name = dataset_name
 
     def _init_models(self):
         return [
-            init_model(capacity, self.n_classes, torch.device("cpu"))
+            init_model(capacity, self.n_classes, torch.device("cpu"), self.dataset_name)
             for capacity in self.available_model_capacities
         ]
 
@@ -55,6 +64,7 @@ class FedDF(FedProx):
             get_parameters(model) for model in models
         ]
         self.model_lens = [len(ma) for ma in model_arrays]
+        self.model_arrays = model_arrays
         return ndarrays_to_parameters(
             self._flatten_models(model_arrays)
         )
@@ -127,15 +137,15 @@ class FedDF(FedProx):
             grouped_updated_models[capacity].append(
                 (parameters_to_ndarrays(fit_res.parameters), fit_res.num_examples)
             )
-            tm = init_model(capacity, self.n_classes, self.device)
+            tm = init_model(capacity, self.n_classes, self.device, self.dataset_name)
             set_parameters(tm, parameters_to_ndarrays(fit_res.parameters))
             teacher_models.append(tm)
 
         aggregated_models_dict = {}
         for capacity in self.available_model_capacities:
             if len(grouped_updated_models[capacity]) == 0:
-                # no client with this architecture was trained. retain the last value
-                raise Exception("This case still needs to be considered")
+                print(f"Using old value as {capacity} has not been trained")
+                aggregated_models_dict[capacity] = self.model_arrays[capacity]
             else:
                 aggregated_models_dict[capacity] = aggregate(grouped_updated_models[capacity])
 
@@ -143,7 +153,7 @@ class FedDF(FedProx):
         updated_models_list = []
         for capacity in self.available_model_capacities:
             print(f"KD model with capacity {capacity}")
-            student_model = init_model(capacity, self.n_classes, self.device)
+            student_model = init_model(capacity, self.n_classes, self.device, self.dataset_name)
             set_parameters(student_model, aggregated_models_dict[capacity])
             optimization_config = OptimizationConfig(
                 model=student_model,
@@ -162,6 +172,8 @@ class FedDF(FedProx):
                 get_parameters(student_model)
             )
 
+        # save the latest model versions
+        self.model_arrays = updated_models_list
         updated_models_list = self._flatten_models(updated_models_list)
         return ndarrays_to_parameters(updated_models_list)
 

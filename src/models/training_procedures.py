@@ -52,7 +52,13 @@ def train_fpx(optimization_config: OptimizationConfig, global_model, mu):
         optimizer.step()
 
 
-def train_fd(optimization_config: OptimizationConfig, kd_weight, logit_matrix, num_classes):
+def train_fd(
+        optimization_config: OptimizationConfig,
+        kd_weight,
+        logit_matrix,
+        num_classes,
+        temperature
+):
 
     model = optimization_config.model
     optimizer = optimization_config.optimizer
@@ -72,18 +78,20 @@ def train_fd(optimization_config: OptimizationConfig, kd_weight, logit_matrix, n
         loss = criterion(preds, targets)
         if not empty_logit_matrix:
             # CrossEntropyLoss performs softmax internally, so no need to call the softmax here
-            loss += kd_weight * criterion(preds, logit_matrix[targets])
+            loss += kd_weight * criterion(preds / temperature, logit_matrix[targets])
 
         model.zero_grad()
         loss.backward()
         optimizer.step()
 
         cnts += torch.bincount(targets, minlength=num_classes)
-        preds = torch.nn.functional.softmax(preds, dim=1)
+        preds = torch.nn.functional.softmax(preds / temperature, dim=1)
         running_sums += construct_matrix(preds, targets, num_classes)
-    running_sums /= cnts
-    running_sums = running_sums.cpu().numpy()
-    return running_sums
+    running_sums = running_sums[cnts > 0]
+    client_classes = (cnts > 0).cpu().numpy()
+    cnts = cnts[cnts > 0].reshape(-1, 1)
+    running_sums = (running_sums / cnts).cpu().numpy()
+    return [running_sums, client_classes]
 
 
 # pylint: disable=C0103

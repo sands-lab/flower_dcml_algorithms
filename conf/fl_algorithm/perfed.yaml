@@ -1,0 +1,5 @@
+client:
+  _target_: src.clients.perfed_client.PerFedClient
+  n_public_layers: 2
+strategy:
+  _target_: src.strategies.perfed.PerFed

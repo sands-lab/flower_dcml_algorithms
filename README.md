@@ -9,15 +9,15 @@ To download the data and create the partitionings, you may use the `generate_par
 ```bash
 python generate_partitions.py \
     --dataset_name=cifar10 \
-    --num_clients=50 \
+    --n_clients=50 \
     --seed=1602 \
     --test_percentage=0.2 \
-    --partition_method=dirichlet \
+    --partitioning_method=dirichlet \
     --alpha=50 \
     --min_size_of_dataset=10
 ```
 
-generates a `data/partitions/cifar10/dirichlet_50clients_1602seed_50.0alpha_0.2test` folder. This contains a `generation_config.json` file with all the configuration stored in a `.json` format, and two files for every client:
+generates a `data/partitions/cifar10/dirichlet_50clients_1602seed_50.0alpha_0.2test` folder. This contains a `generation_config.json` file with the configuration stored in a `.json` file, and two `.csv` files for every client:
 
 - a `partition_X_train.csv`, where *X* is the sequence number of the client;
 - a `partition_X_test.csv`, where *X* is the sequence number of the client.
@@ -40,7 +40,7 @@ To simulate the experiment on IBEX (or locally), you just need to issue the comm
 - `fl_algorithm`, which indicates both the strategy and the client functions of the FL algorithm;
 - Any data concerning local training and global training.
 
-Note, that `dataset` and `partitioning_configuration` uniquely determine the data partitioning configuration - during runtime, the clients will have data as set in the `data/partitions/{dataset}/{partitioning_configuration}`.
+Note, that `dataset` and `partitioning_configuration` uniquely determine the data partitioning configuration - during runtime, the clients will have data as set in the `data/partitions/{dataset}/{partitioning_configuration}` folder.
 
 Alternatively, you may also run the `./run_experiment.sh` command (**recommended approach**).
 
@@ -57,9 +57,9 @@ Refer to hydra documentation for further details on overriding configuration fil
 
 The `run_server.sh` and the `run_experiment.sh` scripts may be customized with some variables, which are set within the script:
 
-* `LOG_TO_WANDB`: if set to `1`, the accuracy will be persisted and logged to a local folder within the `logs` folder. If set to `0`, the accuracy will only be printed to the output.
-* `SYNC_WITH_WANDB_CLOUD`: if set to `1`, after the experiment the results will be synchronized with the wandb cloud. If set to `0`, the results will only be available locally.
-* `IBEX_SIMULATION`: set to `1` if running on IBEX, locally, or on docker. Setting the value to `1` causes the environment variables to be read from the `.env` file. When running on the testbed, all the environment variables should be set by the runtime, so in this case you should set the variable to `0`.
+* `LOG_TO_WANDB`: if set to $1$, the accuracy will be persisted and logged to a local folder within the `logs` folder. If set to $0$, the accuracy will only be printed to the output.
+* `SYNC_WITH_WANDB_CLOUD`: if set to $1$, after the experiment the results will be synchronized with the wandb cloud. If set to $0$, the results will only be available locally.
+* `IBEX_SIMULATION`: set to $1$ if running on IBEX, locally, or on docker. Setting the value to $1$ causes the environment variables to be read from the `.env` file. When running on the testbed, all the environment variables should be set by the runtime, so in this case you should set the variable to $0$.
 
 ### Running on docker
 
@@ -77,13 +77,15 @@ Currently the following algorithms are implemented:
 
 #### Private training
 
-Simulation of the accuracy achieved if every client trained independently on its own dataset:
+Simulation of the accuracy achieved if every client trains independently on its own dataset:
 
 ```bash
 python fl.py fl_algorithm=private_training
 ```
 
-*Comments*: this procedure is still implemented in Flower. This means, that at every epoch a sample of clients are sampled and trained with the parameters set in `base_config.yaml`.
+*Comments*:
+
+- this procedure is implemented in Flower. This means, that at every epoch, a sample of clients are sampled and trained with the parameters set in `base_config.yaml`. When evaluating the model, a random sample of clients is selected. The selected clients may or may not have been trained in the last epoch. If this is something you wish to avoid, set `global_train.fraction_fit` to `1.0`, so that every client is trained at every epoch.
 
 #### FedAvg
 
@@ -91,7 +93,9 @@ python fl.py fl_algorithm=private_training
 python fl.py fl_algorithm=fedavg
 ```
 
-*Comments*: state which model architecture (by means of the `client_capacity` parameter) in the `fedavg.yaml` file.
+*Comments*:
+
+- You can state which model architecture should be used in the `fedavg.yaml` file by setting the `client_capacity` parameter.
 
 
 #### FedProx
@@ -100,35 +104,38 @@ python fl.py fl_algorithm=fedavg
 python fl.py fl_algorithm=fedprox
 ```
 
-*Comments*: Set the regularization strength and the model architecture in the `fedprox.yaml` file.
+*Comments*:
 
+- Set the regularization strength and the model architecture in the `fedprox.yaml` file.
+- Same consideration as for FedAvg regarding model architecture.
 
 #### FD
 
 Implementation of the algorihtm proposed `Communication-Efficient On-Device Machine Learning: Federated Distillation and Augmentation under Non-IID Private Data`.
 
 ```bash
-python fl.py fl_algorithm=fedprox
+python fl.py fl_algorithm=fd
 ```
 
-*Comments*: Set the regularization strength in the `fedprox.yaml` file.
+*Comments*:
 
-### Work in progress
+- Set the regularization strength in the `fd.yaml` file;
+- *the uploaded local-average logit vectors from all devices are averaged, resulting in a global-average logit vector per label*, but in the pseudocode the the output logits are never averaged. Also, the output logits are not "global", but are personalized for every client;
+- It is not stated explicitly in the text, but the algorithm requires full client participation;
+- Uses CE as the distillation loss function;
+- the temperature for the softmax function is never addressed, so I assumed it was set to $1$. Nevertheless, this parameter may be changed in the `fd.yaml` file;
+- In the paper, also FedAug is proposed, but we ignore this extension in the implementation;
+Reproducing the paper results:
 
-#### FedMD
+*Reproducing the results*
 
-Implementation of the algorithm proposed in `FedMD: Heterogenous Federated Learning via Model Distillation`
-
-```bash
-python fl.py fl_algorithm=fedmd
-```
-
-*Comments*: Paper lacks a lot of details regarding the implementation. For instance:
-
-- it is not stated which loss function is used for distilling knowledge. The authors only state that `the models communicate and align their logits computed from public data without applying the softmax activation layer`. In the implementation, I decided to use MSE loss.
-- it is not described how to switch from the pre-trained model to the actual model of interest. This is something that still needs to be implemented in our code.
-- **We should drop this algorithm!!**
-
+- Not stated model architecture, but only the number of parameters. I managed to obtain the same number of parameters by using the architecture called `Net` in https://github.com/pytorch/examples/blob/main/mnist/main.py and by setting all the biases to `False`.
+- The way they construct the non-IID datasets is not completely clear;
+- Not stated which optimizer they used (SGD, Adam, ...), nor any hyperparameter (learning rate, strength of the KD regularization term, ...)
+- From the algorithm, it is not clear how to handle cases in which some client does not have some target labels. Line 8 will result in an exception. In the paper *Distillation-Based Semi-Supervised Federated Learning for Communication-Efficient Collaborative Training With Non-IID Private Data* they propose a solution, but it does not seem right (denominator should have -1 or not depending on whether the client has label or not);
+- could not reproduce the results, probably because different hyperparameters, model architecture etc.
+- The results I obtain are much better than the ones reported in the paper;
+- The algorithm as implemented outperforms private training.
 
 #### DS-FL
 
@@ -140,9 +147,54 @@ python fl.py fl_algorithm=ds_fl
 
 *Comments*:
 
-- In the paper, it seems that every clients needs to participate in every training epoch (double check this). In the implementation, we support partial client participation;
-- TO-DO: Currently, the clients do not share the index set of the data points for the next training epoch. Instead, the whole public dataset is exchanged at every training epoch.
+- From the paper, it is not clear whether every clients needs to participate in every training epoch (*the evaluations are conducted without any missing clients per round*). In the implementation, we support partial client participation under the condition, that the same set of clients is sampled during the update and distillation phase in algorithm 1.;
+- In the implementation, the clients do not share the index set of the data points for the next training epoch. Instead, the whole public dataset is exchanged at every training epoch.
 
+#### Lg-FedAvg, PerFed
+
+Implementation of `Think Locally, Act Globally: Federated Learning with Local and Global Representation` and `Federated Learning with Personalization Layers`
+
+```bash
+python fl.py fl_algorithm=lg_fedavg
+python fl.py fl_algorithm=perfed
+```
+
+#### FedDF
+
+Implementation of `Ensemble Distillation for Robust Model Fusion in Federated Learning`
+
+```bash
+python fl.py fl_algorithm=feddf
+```
+
+### Work in progress
+
+#### FedKD
+
+Implementation of `FedKD: Communication Efficient Federated Learning via Knowledge Distillation`
+
+```bash
+python fl.py fl_algorithm=fedkd
+```
+
+*Comments*:
+
+- The way it is written `Algorithm 1` in the paper, it seems that gradients are synchronized after each GD update. However, this seems very inefficient (also considering that the paper is titled "communication efficient"), so we resolve to use a more practical approach, i.e. training for a given number of local training epochs;
+- In the paper, the authors propose SVD & encription to reduce communication and to increase security. However, security is not the focus of this repository, so we omit it. Also, implementing SVD only for this algorithm would give to this algorithm an unfair advantage over the others. Therefore, in the implementation we omit SVD-ing the gradients.
+
+
+#### FedGKT
+
+Implementation of `Group Knowledge Transfer:
+Federated Learning of Large CNNs at the Edge`
+
+```bash
+python fl.py fl_algorithm=fedgkt
+```
+
+*Comments*:
+
+- Implementation contains some bug
 
 ## Logging data to W&B
 
@@ -159,6 +211,11 @@ WANDB_PROJECT=<fill your value>
 ```
 
 
+## Model customization
+
+In several algorithms, each client may independently choose its model architecture (restrictions apply depending on the algorithm, e.g. in PerFed all model architectures need to share the same architecture for the lowermost layers). In the implementation, this is achieved by assigning to every client an integer value $C$ which states its capacity. In the testbed, this value will need to be configured manually, while in the simulations (`fl.py`) this value is set randomly.
+
+Either way, after determining the model capacity, the client loads the model as specified in the `model_mapping.json` file.
 
 ## TO-DOs
 

@@ -1,6 +1,7 @@
-import torch
+import json
+import importlib
 
-from src.models.convnet import ConvNet, ConvNet2
+import torch
 
 
 def construct_matrix(preds, targets, num_classes):
@@ -12,10 +13,14 @@ def construct_matrix(preds, targets, num_classes):
     return result_matrix
 
 
-def init_model(client_capacity, n_classes, device):
-    model = {
-        0: ConvNet,
-        1: ConvNet2,
-    }[client_capacity](n_classes)
+def init_model(client_capacity, n_classes, device, dataset):
+    with open("model_mapping.json", "r") as fp:
+        mapping = json.load(fp)
+    class_string = mapping[dataset][str(client_capacity)]
+    module_name, class_name = class_string.rsplit('.', 1)
+    module = importlib.import_module(module_name)
+    class_ = getattr(module, class_name)
+    model = class_(n_classes)
+
     model.to(device)
     return model

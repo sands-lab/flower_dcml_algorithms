@@ -71,7 +71,7 @@ def run(cfg: ParamConfig):
 
         client_fn = instantiate(cfg.fl_algorithm.client, _partial_=True)
 
-        client_resources = {"num_gpus": 1, "num_cpus": 1}
+        client_resources = {"num_cpus": 4, "num_gpus": 0.5}
         common_kwargs = {
             "images_folder": f"{data_home_folder}/{data_config['dataset_name']}",
             "partition_folder": partition_folder,
@@ -85,13 +85,14 @@ def run(cfg: ParamConfig):
             client_fn_ = partial(client_fn, **common_kwargs)
         else:
             random_client_capacities = \
-                init_client_id_to_capacity_mapping(data_config["num_clients"], 2)
+                init_client_id_to_capacity_mapping(data_config["n_clients"], 2)
             client_id_to_capacity_mapping_file = f"{temp_dir}/model_capacities.json"
             with open(client_id_to_capacity_mapping_file, "w") as fp:
                 json.dump(random_client_capacities, fp)
 
             if strategy.__class__.__name__ in {"FedDF"}:
                 strategy.set_client_capacity_mapping(client_id_to_capacity_mapping_file)
+                strategy.set_dataset_name(data_config["dataset_name"])
 
             client_fn_ = partial(inject_model_capacity,
                                  client_fn=client_fn,
@@ -100,7 +101,7 @@ def run(cfg: ParamConfig):
 
         fl.simulation.start_simulation(
             client_fn=client_fn_,
-            num_clients=data_config["num_clients"],
+            num_clients=data_config["n_clients"],
             config=fl.server.ServerConfig(num_rounds=cfg.global_train.epochs),
             strategy=strategy,
             client_resources=client_resources,

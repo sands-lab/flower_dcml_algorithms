@@ -23,7 +23,9 @@ class DS_FLClient(BaseClient):
         for batch in dataloader:
             batch = batch[0].to(self.device)
             with torch.no_grad():
-                l = self.model(batch).cpu().numpy()
+                preds = self.model(batch)
+            assert preds.ndim == 2
+            l = torch.nn.functional.softmax(preds, dim=0).cpu().numpy()
             logits.append(l)
         logits = np.vstack(logits)
         return logits

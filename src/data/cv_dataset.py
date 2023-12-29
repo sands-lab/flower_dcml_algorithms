@@ -28,8 +28,8 @@ class CustomDataset(Dataset):
     def __getitem__(self, idx):
         row = self.df.iloc[idx]
         target = row["label"]
-        image_idx = row["idx"]
-        image = Image.open(f"{self.images_folder}/{image_idx}.jpg")
+        image_file = row["filename"]
+        image = Image.open(f"{self.images_folder}/{image_file}")
         if self.transforms:
             image = self.transforms(image)
         if self.metadata is None:
