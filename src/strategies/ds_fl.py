@@ -7,7 +7,6 @@ import torchvision.transforms.functional as F
 
 from flwr.common import Parameters, ndarrays_to_parameters, parameters_to_ndarrays, FitIns
 from flwr.server.client_manager import ClientManager
-from flwr.server.strategy import FedAvg
 
 from src.strategies.commons import (
     configure_evaluate_no_params,
@@ -16,15 +15,15 @@ from src.strategies.commons import (
     get_config
 )
 from src.helper.commons import np_softmax
+from src.strategies.fedavg import FedAvg
 
 
 # pylint: disable=C0103
 class DS_FL(FedAvg):
 
-    def __init__(self, n_classes, temperature, aggregation_method, public_dataset_name,
+    def __init__(self, temperature, aggregation_method, public_dataset_name,
                  public_dataset_size, public_dataset_csv, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.n_classes = n_classes
         assert aggregation_method in {"era", "sa"}
         assert (temperature == -1) == (aggregation_method == "sa")
         self.aggregation_method = aggregation_method
@@ -107,6 +106,9 @@ class DS_FL(FedAvg):
     def configure_evaluate(
         self, server_round: int, parameters: Parameters, client_manager: ClientManager
     ):
+        if not self.evaluate_round(server_round):
+            return []
+
         clients = sample_clients(self, client_manager)
         return configure_evaluate_no_params(
             strategy=self,

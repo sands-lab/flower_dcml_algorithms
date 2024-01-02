@@ -55,6 +55,7 @@ def run(cfg: ParamConfig):
     strategy = instantiate(
         cfg.fl_algorithm.strategy,
         n_classes=n_classes,
+        evaluation_freq=cfg.global_train.evaluation_freq,
         fraction_fit=cfg.global_train.fraction_fit,
         fraction_evaluate=cfg.global_train.fraction_eval,
         min_fit_clients=1,
@@ -71,7 +72,10 @@ def run(cfg: ParamConfig):
 
         client_fn = instantiate(cfg.fl_algorithm.client, _partial_=True)
 
-        client_resources = {"num_cpus": 4, "num_gpus": 0.5}
+        client_resources = {
+            "num_cpus": cfg.ray_client_resources.num_cpus,
+            "num_gpus": cfg.ray_client_resources.num_gpus if torch.cuda.is_available() else 0
+        }
         common_kwargs = {
             "images_folder": f"{data_home_folder}/{data_config['dataset_name']}",
             "partition_folder": partition_folder,

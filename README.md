@@ -150,14 +150,39 @@ python fl.py fl_algorithm=ds_fl
 - From the paper, it is not clear whether every clients needs to participate in every training epoch (*the evaluations are conducted without any missing clients per round*). In the implementation, we support partial client participation under the condition, that the same set of clients is sampled during the update and distillation phase in algorithm 1.;
 - In the implementation, the clients do not share the index set of the data points for the next training epoch. Instead, the whole public dataset is exchanged at every training epoch.
 
-#### Lg-FedAvg, PerFed
+#### Lg-FedAvg
 
-Implementation of `Think Locally, Act Globally: Federated Learning with Local and Global Representation` and `Federated Learning with Personalization Layers`
+Implementation of `Think Locally, Act Globally: Federated Learning with Local and Global Representation`.
 
 ```bash
 python fl.py fl_algorithm=lg_fedavg
+```
+
+*Comments*:
+
+- In section C.2.2 the authors say that:
+    - They resize the input images to 224x224, but this doesn't make sense! Besides, in the code they don't do it https://github.com/pliang279/LG-FedAvg/blob/master/utils/train_utils.py;
+    - `We use the two convolutional layers for the global model` but this is just the opposite of what they are doing! In the paper they propose to use the lowermost layers as private model and uppermost as public model!
+- In the repository, they say that in order to reproduce the results, you first need to run FedAvg and then load the model obtained with FedAvg and further train it with LG-FedAvg, but in the paper they never say they do anything of the sort. In the paper they only say in section C.2.2 that *We train LG-FEDAVG with global updates until we reach a goal accuracy (57% for CIFAR-10) before training for additional rounds to jointly update local and global models.*.....
+- In section C.2.1 they say they use the last two layers to form the global model, but in order to get the stated number of parameters you need to take the last $3$ layers.
+
+#### PerFed
+
+Implementation of `Federated Learning with Personalization Layers`.
+
+```bash
 python fl.py fl_algorithm=perfed
 ```
+
+#### FedRecon
+
+Implementation of `Federated Reconstruction: Partially Local Federated Learning`
+
+
+```bash
+python fl.py fl_algorithm=fedrecon
+```
+
 
 #### FedDF
 
@@ -222,5 +247,5 @@ Either way, after determining the model capacity, the client loads the model as 
 - Check all the algorithms implemented so far for correctness;
 - Correct FedGKT;
 - Try to reproduce some results;
-- Next implement: FedKD, HeteroFL/FjORD, FedRolex, Federated Dropout, FedRecon;
+- Next implement: FedKD, HeteroFL/FjORD, FedRolex, Federated Dropout;
 - Run experiment on testbed.

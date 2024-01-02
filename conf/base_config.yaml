@@ -4,18 +4,22 @@ defaults:
 
 data:
   dataset: cifar10
-  partitioning_configuration: dirichlet_20clients_23seed_20.0alpha_0.2test
+  partitioning_configuration: shard_20clients_10seed_0.2test_0holdoutsize_2shards
 global_train:  # parameters passed to the strategy during initialization
-  epochs: 2
-  fraction_fit: 0.2
-  fraction_eval: 0.5
+  epochs: 4
+  evaluation_freq: 2
+  fraction_fit: 1.0
+  fraction_eval: 1.0
 local_train:  # passed to the client in the config file
   lr: 0.001
   local_epochs: 1
-  batch_size: 32
-  optimizer: "adam"
+  batch_size: 64
+  optimizer: adam
 general:
   seed: 10
+ray_client_resources:
+  num_cpus: 2
+  num_gpus: 0.5
 
 hydra:
   output_subdir: null

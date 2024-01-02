@@ -14,26 +14,30 @@ Base class for Partially Local Federated Training algorithms
 
 class PLFT(BaseClient):
 
-    def __init__(self, n_public_layers, **kwargs):
+    def __init__(self, n_public_layers, stateful_client=True, **kwargs):
         self.n_public_layers = n_public_layers
-        super().__init__(**kwargs, stateful_client=True)
+        super().__init__(**kwargs, stateful_client=stateful_client, strict_load=False)
 
-    def split_model(self, model):
+    def split_model_layer_names(self, model_names):
         """Return a tuple with private and public part of the model as OrderedDict"""
         raise NotImplementedError("The split model must be implemented")
 
-    def _init_model(self):
-        self.model = init_model(
-            client_capacity=self.client_capacity,
-            n_classes=self.n_classes,
-            device=self.device,
-            dataset=self.dataset_name
-        )
-        try:
-            self.model.load_state_dict(torch.load(self.model_save_file), strict=False)
-        except:
-            private_model_dict, _ = self.split_model(self.model)
-            torch.save(private_model_dict, self.model_save_file)
+    def extract_ordereddict(self, model, layer_names):
+        return OrderedDict({k: v for k, v in model.state_dict().items()
+                            if ".".join(k.split(".")[:-1]) in layer_names})
+
+    def split_model(self, model: torch.nn.Module):
+        model_layer_names = [".".join(l.split(".")[:-1]) for l, _ in model.named_parameters()]
+        unique_layer_names, seen_layers = [], set()
+        for mln in model_layer_names:
+            if mln not in seen_layers:
+                unique_layer_names.append(mln)
+                seen_layers.add(mln)
+        private_layer_names, public_layer_names = self.split_model_layer_names(unique_layer_names)
+        print(private_layer_names, public_layer_names)
+        private_model_dict = self.extract_ordereddict(model, private_layer_names)
+        public_model_dict = self.extract_ordereddict(model, public_layer_names)
+        return private_model_dict, public_model_dict
 
     def get_parameters(self, config):
         _, public_model = self.split_model(self.model)

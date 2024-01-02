@@ -6,7 +6,6 @@ from flwr.common import (
     FitIns
 )
 from flwr.server.client_manager import ClientManager
-from flwr.server.strategy import FedAvg
 
 from src.strategies.commons import (
     configure_evaluate_no_params,
@@ -14,13 +13,13 @@ from src.strategies.commons import (
     sample_clients,
     get_config
 )
+from src.strategies.fedavg import FedAvg
 
 
 class FD(FedAvg):
 
-    def __init__(self, n_classes, *args, **kwargs):
+    def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.n_classes = n_classes
         assert kwargs["fraction_fit"] == 1.0, "FD only supports full client participation!!"
 
     def initialize_parameters(self, client_manager: ClientManager):
@@ -79,6 +78,9 @@ class FD(FedAvg):
     def configure_evaluate(
         self, server_round: int, parameters: Parameters, client_manager: ClientManager
     ):
+        if not self.evaluate_round(server_round):
+            return []
+
         clients = sample_clients(self, client_manager)
         return configure_evaluate_no_params(
             strategy=self,

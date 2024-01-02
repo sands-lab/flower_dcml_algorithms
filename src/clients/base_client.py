@@ -1,6 +1,6 @@
 import os
 import time
-from logging import INFO
+from logging import INFO, DEBUG
 
 import flwr as fl
 from flwr.common.logger import log
@@ -26,10 +26,12 @@ class BaseClient(fl.client.NumPyClient):
             seed,
             experiment_folder,
             client_capacity,
-            stateful_client
+            stateful_client,
+            strict_load=True
     ):
         super().__init__()
         self.cid = cid
+        self.strict_load = strict_load
         self.stateful_client = stateful_client
         self.client_working_folder = f"{experiment_folder}/{cid}"
         self.dataset_name = os.path.split(images_folder)[-1]
@@ -66,11 +68,18 @@ class BaseClient(fl.client.NumPyClient):
 
         if self.stateful_client:
             try:
-                self.model.load_state_dict(torch.load(self.model_save_file), strict=True)
+                load_dict = torch.load(self.model_save_file)
+                log(DEBUG, f"Loading model {list(load_dict.keys())}")
+                self.model.load_state_dict(load_dict, strict=self.strict_load)
             except:
                 self.save_model_to_disk()  # actually, we might not need this
 
     def _init_dataloader(self, train, batch_size, metadata=None):
+        dataset = self._init_dataset(train, metadata)
+        dataloader = DataLoader(dataset, batch_size=batch_size, shuffle=train)
+        return dataloader
+
+    def _init_dataset(self, train, metadata):
         if train:
             transforms = T.Compose([T.ToTensor(), T.RandomHorizontalFlip()])
         else:
@@ -82,8 +91,7 @@ class BaseClient(fl.client.NumPyClient):
                                 partition_csv=partition_file,
                                 transforms=transforms,
                                 metadata=metadata)
-        dataloader = DataLoader(dataset, batch_size=batch_size, shuffle=train)
-        return dataloader
+        return dataset
 
     @sync_rng_state
     def evaluate(self, parameters, config):

@@ -1,13 +1,16 @@
+from collections import OrderedDict
 from dataclasses import dataclass, field
 
 import torch
 
 
 def init_optimizer(model, optimizer_name, lr):
+    parameters = model.parameters()
+
     if optimizer_name == "adam":
-        optimizer = torch.optim.Adam(model.parameters(), lr=lr)
+        optimizer = torch.optim.Adam(parameters, lr=lr)
     elif optimizer_name == "sgd":
-        optimizer = torch.optim.SGD(model.parameters(), lr=lr)
+        optimizer = torch.optim.SGD(parameters, lr=lr)
     else:
         raise RuntimeError(f"Optimizer {optimizer_name} is not allowed")
     return optimizer

@@ -223,3 +223,32 @@ def train_feddf(optimization_config: OptimizationConfig, temperature, teacher_mo
             model.zero_grad()
             loss.backward()
             optimizer.step()
+
+
+def train_model_layers(optimization_config: OptimizationConfig, train_layers, gd_steps: int):
+    model = optimization_config.model
+    optimizer = init_optimizer(
+        model,
+        optimization_config.optimizer_name,
+        lr=optimization_config.lr
+    )
+    for k, v in model.state_dict().items():
+        v.requires_grad = k in train_layers
+    criterion = torch.nn.CrossEntropyLoss()
+
+    i = 0
+    for images, target_logits in _iterate_dataloader(optimization_config):
+        pred_logits = model(images)
+
+        loss = criterion(pred_logits, target_logits)
+
+        model.zero_grad()
+        loss.backward()
+        optimizer.step()
+
+        i += 1
+        if gd_steps is not None and i >= gd_steps:
+            break
+
+    for k, v in model.state_dict().items():
+        v.requires_grad = True

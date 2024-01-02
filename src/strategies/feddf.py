@@ -10,7 +10,6 @@ from flwr.common import (
 )
 from flwr.server.client_manager import ClientManager
 from flwr.server.strategy.aggregate import aggregate
-from flwr.server.strategy import FedProx
 
 from src.helper.parameters import get_parameters, set_parameters
 from src.helper.optimization_config import OptimizationConfig
@@ -22,16 +21,15 @@ from src.strategies.commons import (
     sample_clients
 )
 from src.data.cv_dataset import UnlabeledDataset
-
+from src.strategies.fedprox import FedProx
 
 
 class FedDF(FedProx):
 
-    def __init__(self, n_classes, public_dataset_name, kd_temperature, kd_optimizer,
+    def __init__(self, public_dataset_name, kd_temperature, kd_optimizer,
                  kd_lr, kd_epochs, public_dataset_size, *args,
                  client_to_capacity_mapping_file=None, **kwargs):
         super().__init__(*args, **kwargs)
-        self.n_classes = n_classes
         self.available_model_capacities = [0, 1]
         self.model_lens = None
         self.set_client_capacity_mapping(client_to_capacity_mapping_file)
@@ -181,6 +179,9 @@ class FedDF(FedProx):
     def configure_evaluate(
         self, server_round: int, parameters: Parameters, client_manager: ClientManager
     ):
+        if not self.evaluate_round(server_round):
+            return []
+
         clients = sample_clients(self, client_manager)
         config = get_config(self, server_round)
 
