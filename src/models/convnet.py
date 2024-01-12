@@ -10,8 +10,9 @@ from src.models.abstract_model import AbstratModel
 
 
 class ConvNet(AbstratModel):
-    def __init__(self, n_classes, rate) -> None:
-        whole_model_config = [3, 6, 16, 120, 84, n_classes]
+    def __init__(self, n_classes, rate, whole_model_config=None) -> None:
+        if whole_model_config is None:
+            whole_model_config = [3, 6, 16, 120, 84, n_classes]
         super().__init__(whole_model_config, rate)
 
         self.conv1 = nn.Conv2d(self.model_config[0], self.model_config[1], 5)
@@ -48,24 +49,17 @@ class ConvNet(AbstratModel):
         return expanded_config
 
 
-class ConvNet2(nn.Module):
-    def __init__(self, n_classes) -> None:
-        super().__init__()
-        self.conv1 = nn.Conv2d(3, 16, 5)
-        self.pool = nn.MaxPool2d(2, 2)
-        self.conv2 = nn.Conv2d(16, 32, 5)
-        self.fc1 = nn.Linear(32 * 5 * 5, 120)
-        self.fc2 = nn.Linear(120, 96)
-        self.fc3 = nn.Linear(96, n_classes)
+class LargeConvNet(ConvNet):
+    def __init__(self, n_classes, rate) -> None:
+        whole_model_config = [3, 32, 48, 168, 84, n_classes]
+        super().__init__(n_classes, rate, whole_model_config)
 
-    def forward(self, x: torch.Tensor) -> torch.Tensor:
-        x = self.pool(F.relu(self.conv1(x)))
-        x = self.pool(F.relu(self.conv2(x)))
-        x = x.view(-1, 32 * 5 * 5)
-        x = F.relu(self.fc1(x))
-        x = F.relu(self.fc2(x))
-        x = self.fc3(x)
-        return x
+
+################################################################################################
+################################################################################################
+######### THE FOLLOWING MODELS SHOULD ONLY BE USED FOR REPRODUCING RESULTS FROM PAPERS #########
+################################################################################################
+################################################################################################
 
 
 class MnistFDNet(nn.Module):

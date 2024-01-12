@@ -1,5 +1,12 @@
 # Framework Usage
 
+# Introduction
+
+This repository contains a set of FL algorithms that support model customization (i.e. different clients have different model architectures). The final goal is to deploy the algorithms to the FL testbed (23 linux devices) and compare the algorithms in terms of accuracy, energy usage, elapsed time, network usage, temperatures on the core, ... in a real-world situation.
+
+The framework is easy to extend: you just need to include the server logic in a python script in the `src/strategies` folder, the client logic in a script in the `src/clients` folder, and a configuration file in the `config/fl_algorithm` folder. Check out existing algorithms to see the provided level of abstraction and to find quite a bit of re-usable logic (decorators, functions, methods, ...), which may help you so as not to write too much flower boilerplate code.
+
+
 ## Data preparation
 
 Any data preparation (download, partitioning, distribution to clients, ...) needs to be done off-line, i.e. before running the actual FL experiment. This is done so as not to introduce any computational requirements to the clients.
@@ -190,6 +197,24 @@ Implementation of `Ensemble Distillation for Robust Model Fusion in Federated Le
 
 ```bash
 python fl.py fl_algorithm=feddf
+```
+
+
+#### HeteroFL
+
+Implementation of `HETEROFL: COMPUTATION AND COMMUNICATION EFFICIENT FEDERATED LEARNING FOR HETEROGENEOUS CLIENTS`
+
+```bash
+python fl.py fl_algorithm=heterofl
+```
+
+
+#### Federated Dropoud
+
+Implementation of `EXPANDING THE REACH OF FEDERATED LEARNING BY REDUCING CLIENT RESOURCE REQUIREMENTS`
+
+```bash
+python fl.py fl_algorithm=federated_dropout
 ```
 
 ### Work in progress

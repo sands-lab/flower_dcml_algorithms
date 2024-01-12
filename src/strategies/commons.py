@@ -100,5 +100,5 @@ def set_client_capacity_mapping(filepath):
         for k, v in client_to_capacity_mapping.items():
             assert isinstance(k, str) and isinstance(v, int), f"{type(k)} {type(v)}"
 
-    print("Client capacity mapping:\n", json.dumps(client_to_capacity_mapping), indent=4)
+    print("Client capacity mapping:\n", json.dumps(client_to_capacity_mapping, indent=4))
     return client_to_capacity_mapping

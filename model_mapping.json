@@ -1,6 +1,6 @@
 {
     "cifar10": {
-        "0": "src.models.convnet.LeNet5",
+        "0": "src.models.convnet.LargeConvNet",
         "1": "src.models.convnet.ConvNet"
     },
     "mnist": {
