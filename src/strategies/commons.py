@@ -1,3 +1,4 @@
+import json
 import inspect
 
 import numpy as np
@@ -86,3 +87,18 @@ def get_config(strategy: FedAvg, server_round: int):
     elif step == "evaluate" and strategy.on_evaluate_config_fn is not None:
         config = strategy.on_evaluate_config_fn(server_round)
     return config
+
+
+def set_client_capacity_mapping(filepath):
+    if filepath is None:
+        client_to_capacity_mapping = None
+    else:
+        with open(filepath, "r") as fp:
+            client_to_capacity_mapping = json.load(fp)
+
+        # sanity check
+        for k, v in client_to_capacity_mapping.items():
+            assert isinstance(k, str) and isinstance(v, int), f"{type(k)} {type(v)}"
+
+    print("Client capacity mapping:\n", json.dumps(client_to_capacity_mapping), indent=4)
+    return client_to_capacity_mapping

@@ -3,7 +3,6 @@ from collections import OrderedDict
 import torch
 
 from src.clients.base_client import BaseClient
-from src.models.helper import init_model
 from src.models.training_procedures import train
 from src.helper.commons import sync_rng_state
 

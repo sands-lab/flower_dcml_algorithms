@@ -4,6 +4,6 @@ strategy:
   _target_: src.strategies.ds_fl.DS_FL
   temperature: 0.1
   aggregation_method: era
-  public_dataset_name: mnist
+  public_dataset_name: ...
   public_dataset_size: 2000
   public_dataset_csv: null #data/partitions/mnist/shard_100clients_19seed_0.2test_5000holdoutsize/public_dataset.csv

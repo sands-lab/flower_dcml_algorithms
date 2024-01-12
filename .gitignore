@@ -10,3 +10,6 @@ secrets.env
 *.jpg
 *.png
 *.jpeg
+*.out
+*.err
+*.ipynb

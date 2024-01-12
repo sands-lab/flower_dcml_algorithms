@@ -177,7 +177,7 @@ def _generate_partitions_as_FD(partitioning_config: FDPartitioning, metadata_df)
     start_idx = 0
     for size in partition_sizes:
         partitions.append(
-            df.iloc[start_idx : start_idx+size].reset_index(drop=True).copy()
+            metadata_df.iloc[start_idx : start_idx+size].reset_index(drop=True).copy()
         )
         start_idx += size
 

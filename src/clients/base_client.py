@@ -1,6 +1,6 @@
 import os
 import time
-from logging import INFO, DEBUG
+from logging import INFO
 
 import flwr as fl
 from flwr.common.logger import log
@@ -43,9 +43,9 @@ class BaseClient(fl.client.NumPyClient):
         self.device = torch.device("cuda:0") if torch.cuda.is_available() else torch.device("cpu")
         self.n_classes = 10
         self.client_capacity = client_capacity
-        self._init_model()
         self.images_folder = images_folder
         self.partition_folder = partition_folder
+        self._init_model()
         save_rng_state_if_not_exists(self.client_working_folder)
         log(INFO, "Initialed client %s [model %s] on %s...", cid,
             self.model.__class__.__name__, self.device)
@@ -69,7 +69,6 @@ class BaseClient(fl.client.NumPyClient):
         if self.stateful_client:
             try:
                 load_dict = torch.load(self.model_save_file)
-                log(DEBUG, f"Loading model {list(load_dict.keys())}")
                 self.model.load_state_dict(load_dict, strict=self.strict_load)
             except:
                 self.save_model_to_disk()  # actually, we might not need this

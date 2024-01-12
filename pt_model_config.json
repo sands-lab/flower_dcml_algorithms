@@ -1,0 +1,10 @@
+{
+    "base_models": {
+        "cifar10": "src.models.convnet.ConvNet"
+    },
+    "capacity_mapping": {
+        "0": 1.0,
+        "1": 0.5,
+        "2": 0.25
+    }
+}

@@ -1,5 +1,3 @@
-import json
-
 import torch
 from flwr.common import (
     EvaluateIns,
@@ -18,7 +16,8 @@ from src.models.helper import init_model
 from src.strategies.commons import (
     aggregate_fit_wrapper,
     get_config,
-    sample_clients
+    sample_clients,
+    set_client_capacity_mapping
 )
 from src.data.cv_dataset import UnlabeledDataset
 from src.strategies.fedprox import FedProx
@@ -83,17 +82,7 @@ class FedDF(FedProx):
         return models
 
     def set_client_capacity_mapping(self, filepath):
-        if filepath is None:
-            client_to_capacity_mapping = None
-        else:
-            with open(filepath, "r") as fp:
-                client_to_capacity_mapping = json.load(fp)
-
-            # sanity check
-            for k, v in client_to_capacity_mapping.items():
-                assert isinstance(k, str) and isinstance(v, int), f"{type(k)} {type(v)}"
-
-        self.client_to_capacity_mapping = client_to_capacity_mapping
+        self.client_to_capacity_mapping = set_client_capacity_mapping(filepath)
 
     def _map_client_to_capacities(self, clients):
         return [

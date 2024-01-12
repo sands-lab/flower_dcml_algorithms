@@ -1,4 +1,3 @@
-from collections import OrderedDict
 from dataclasses import dataclass, field
 
 import torch

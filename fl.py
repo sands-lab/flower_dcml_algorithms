@@ -94,7 +94,7 @@ def run(cfg: ParamConfig):
             with open(client_id_to_capacity_mapping_file, "w") as fp:
                 json.dump(random_client_capacities, fp)
 
-            if strategy.__class__.__name__ in {"FedDF"}:
+            if strategy.__class__.__name__ in {"FedDF", "HeteroFL", "FederatedDropout"}:
                 strategy.set_client_capacity_mapping(client_id_to_capacity_mapping_file)
                 strategy.set_dataset_name(data_config["dataset_name"])
 

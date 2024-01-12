@@ -85,3 +85,7 @@ def np_softmax(matrix: np.ndarray, axis: int):
     x_max = np.amax(matrix, axis=axis, keepdims=True)
     exp_x_shifted = np.exp(matrix - x_max)
     return exp_x_shifted / np.sum(exp_x_shifted, axis=axis, keepdims=True)
+
+
+def get_numpy(tensor: torch.Tensor):
+    return tensor.detach().cpu().numpy()

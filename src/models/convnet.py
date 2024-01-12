@@ -1,26 +1,51 @@
+from typing import Dict, List
+
+import numpy as np
 import torch
 import torch.nn.functional as F
 from torch import nn
 
+from src.models.abstract_model import AbstratModel
 
-class ConvNet(nn.Module):
-    def __init__(self, n_classes) -> None:
-        super().__init__()
-        self.conv1 = nn.Conv2d(3, 6, 5)
+
+
+class ConvNet(AbstratModel):
+    def __init__(self, n_classes, rate) -> None:
+        whole_model_config = [3, 6, 16, 120, 84, n_classes]
+        super().__init__(whole_model_config, rate)
+
+        self.conv1 = nn.Conv2d(self.model_config[0], self.model_config[1], 5)
         self.pool = nn.MaxPool2d(2, 2)
-        self.conv2 = nn.Conv2d(6, 16, 5)
-        self.fc1 = nn.Linear(16 * 5 * 5, 120)
-        self.fc2 = nn.Linear(120, 84)
-        self.fc3 = nn.Linear(84, n_classes)
+        self.conv2 = nn.Conv2d(self.model_config[1], self.model_config[2], 5)
+
+        # when we flatten the tensor, each channel gets mapped into 25 values
+        self.flatten_expansion = 5 * 5
+        self.fc1 = nn.Linear(self.model_config[2] * self.flatten_expansion, self.model_config[3])
+        self.fc2 = nn.Linear(self.model_config[3], self.model_config[4])
+        self.fc3 = nn.Linear(self.model_config[4], self.model_config[5])
+        self.layer_names = self.get_ordered_layer_names()
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         x = self.pool(F.relu(self.conv1(x)))
         x = self.pool(F.relu(self.conv2(x)))
-        x = x.view(-1, 16 * 5 * 5)
+        x = x.view(-1, self.model_config[2] * self.flatten_expansion)
         x = F.relu(self.fc1(x))
         x = F.relu(self.fc2(x))
         x = self.fc3(x)
         return x
+
+    def expand_configuration_to_model(self, idx_config: List[np.ndarray]) -> Dict[str, List[int]]:
+        idx_config = [torch.tensor(sorted(c)) for c in idx_config]
+        flattened_layers = [a for a in range(self.flatten_expansion * self.whole_model_config[2])
+                            if a // self.flatten_expansion  in idx_config[2]]
+        expanded_config = {
+            "conv1": (idx_config[1], idx_config[0]),
+            "conv2": (idx_config[2], idx_config[1]),
+            "fc1": (idx_config[3], torch.tensor(flattened_layers)),
+            "fc2": (idx_config[4], idx_config[3]),
+            "fc3": (idx_config[5], idx_config[4]),
+        }
+        return expanded_config
 
 
 class ConvNet2(nn.Module):

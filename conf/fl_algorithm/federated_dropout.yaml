@@ -1,0 +1,4 @@
+client:
+  _target_: src.clients.pt_base_client.PtClient
+strategy:
+  _target_: src.strategies.federated_dropout.FederatedDropout

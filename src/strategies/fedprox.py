@@ -1,6 +1,6 @@
-from src.strategies.fedavg import FedAvg
-
 from flwr.common import FitIns
+
+from src.strategies.fedavg import FedAvg
 
 
 class FedProx(FedAvg):
@@ -26,4 +26,3 @@ class FedProx(FedAvg):
             )
             for client, fit_ins in client_config_pairs
         ]
-
