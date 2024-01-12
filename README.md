@@ -49,7 +49,7 @@ To simulate the experiment on IBEX (or locally), you just need to issue the comm
 
 Note, that `dataset` and `partitioning_configuration` uniquely determine the data partitioning configuration - during runtime, the clients will have data as set in the `data/partitions/{dataset}/{partitioning_configuration}` folder.
 
-Alternatively, you may also run the `./run_experiment.sh` command (**recommended approach**).
+Alternatively, you may also run the `./run_experiment.sh` command (**note, I recommended to use fl.py, as it is the method I'm using.**).
 
 To run an experiment with different configuration, you need to override the default configuration in `conf/base_config.yaml`. Here's a few examples how to achieve this:
 
