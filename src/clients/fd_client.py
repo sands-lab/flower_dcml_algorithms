@@ -3,6 +3,7 @@ import torch
 
 from src.models.training_procedures import train_fd
 from src.clients.base_client import BaseClient
+from src.helper.commons import sync_rng_state
 
 
 class FDClient(BaseClient):
@@ -12,6 +13,7 @@ class FDClient(BaseClient):
         self.kd_weight = kd_weight
         self.temperature = temperature
 
+    @sync_rng_state
     def fit(self, parameters, config):
         trainloader = self._init_dataloader(train=True, batch_size=config["batch_size"])
 

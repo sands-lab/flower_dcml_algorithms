@@ -8,6 +8,13 @@ import torch.nn as nn
 from src.helper.commons import get_numpy
 
 
+def get_reduced_model_config(model_config, rate):
+    model_config = copy.deepcopy(model_config)
+    for i in range(1, len(model_config) - 1):
+        model_config[i] = int(math.ceil(model_config[i] * rate))
+    return model_config
+
+
 class AbstratModel(nn.Module):
     def __init__(self, whole_model_config, rate) -> None:
         super().__init__()
@@ -18,10 +25,7 @@ class AbstratModel(nn.Module):
         self.layer_names = None
 
     def get_reduced_model_config(self, rate):
-        model_config = copy.deepcopy(self.whole_model_config)
-        for i in range(1, len(model_config) - 1):
-            model_config[i] = int(math.ceil(model_config[i] * rate))
-        return model_config
+        return get_reduced_model_config(self.whole_model_config, rate)
 
     def expand_configuration_to_model(self, config) -> typing.Dict[str, typing.List[int]]:
         raise NotImplementedError("Method should be implemented for every model separately")

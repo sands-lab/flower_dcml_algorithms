@@ -26,6 +26,7 @@ def aggregate_submodels(
     for layer_name in previous_model.layer_names:
         layer = layers[layer_name]
         if isinstance(layer, (nn.Linear, nn.Conv2d)):
+            # weight/bias sum/count
             ws, bs = torch.zeros_like(layer.weight), torch.zeros_like(layer.bias)
             wc, bc = torch.zeros_like(layer.weight), torch.zeros_like(layer.bias)
 

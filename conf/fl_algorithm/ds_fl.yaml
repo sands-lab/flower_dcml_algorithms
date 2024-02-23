@@ -1,9 +1,11 @@
 client:
   _target_: src.clients.ds_fl_client.client_fn
+  kd_temperature: 1.0
 strategy:
   _target_: src.strategies.ds_fl.DS_FL
-  temperature: 0.1
-  aggregation_method: era
-  public_dataset_name: ...
-  public_dataset_size: 2000
+  temperature: -1
+  aggregation_method: sa
+  public_dataset_name: cifar100
+  public_dataset_size: 1000
   public_dataset_csv: null #data/partitions/mnist/shard_100clients_19seed_0.2test_5000holdoutsize/public_dataset.csv
+  train_server_model: false

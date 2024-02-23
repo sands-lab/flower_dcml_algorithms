@@ -1,3 +1,5 @@
+import numpy as np
+
 from src.models.training_procedures import train
 from src.clients.base_client import BaseClient
 from src.helper.commons import sync_rng_state
@@ -10,11 +12,14 @@ class FedAvgClient(BaseClient):
 
     @sync_rng_state
     def fit(self, parameters, config):
+        assert all(np.isfinite(param).all() for param in parameters)
+
         trainloader = self._init_dataloader(train=True, batch_size=config["batch_size"])
         self.set_parameters(self.model, parameters)
         train(
             self.get_optimization_config(trainloader, config)
         )
+        assert all(np.isfinite(param).all() for param in self.get_parameters(config={}))
         return self.get_parameters(config={}), len(trainloader.dataset), {}
 
 

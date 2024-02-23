@@ -1,4 +1,5 @@
 import os
+import random
 import tempfile
 import itertools
 from pathlib import Path
@@ -13,7 +14,8 @@ from src.helper.data_partitioning_configuration import (
     PartitioningConfig,
     DirichletPartitioning,
     ShardsPartitioning,
-    FDPartitioning
+    FDPartitioning,
+    IIDPartitioning
 )
 
 
@@ -80,6 +82,7 @@ def download_data(data_home_folder, dataset_name):
 
     dataset_class = {
         "cifar10": vision_datasets.CIFAR10,
+        "cifar100": vision_datasets.CIFAR100,
         "mnist": vision_datasets.MNIST
     }[dataset_name]
 
@@ -131,6 +134,30 @@ def _generate_dirichlet_partition(partitioning_config: DirichletPartitioning, me
     return trainsets, testsets
 
 
+def _generate_IID_partitions(partitioning_config: IIDPartitioning, metadata_df: pd.DataFrame):
+    np.random.seed(partitioning_config.seed)
+    random.seed(partitioning_config.seed)
+    client_partitions = {k: [] for k in range(partitioning_config.n_clients)}
+
+    for _, group_df in metadata_df.groupby("label"):
+        subgroups = np.array_split(range(group_df.shape[0]), partitioning_config.n_clients)
+        for i in range(partitioning_config.n_clients):
+            client_partitions[i].append(group_df.iloc[subgroups[i]])
+    for i in range(partitioning_config.n_clients):
+        client_partitions[i] = pd.concat(client_partitions[i], ignore_index=True)
+        client_partitions[i] = client_partitions[i].sample(frac=1.0).reset_index(drop=True)
+
+    trainsets, testsets = [], []
+    for partition_df in client_partitions.values():
+        test_size = int(partition_df.shape[0] * partitioning_config.test_percentage)
+        partition_test_df = partition_df.iloc[:test_size]
+        partition_train_df = partition_df.iloc[test_size:]
+        trainsets.append(partition_train_df)
+        testsets.append(partition_test_df)
+
+    return trainsets, testsets
+
+
 def _generate_shards_partition(partitioning_config: ShardsPartitioning, metadata_df):
 
     shards = []
@@ -169,6 +196,8 @@ def _generate_shards_partition(partitioning_config: ShardsPartitioning, metadata
 def _generate_partitions_as_FD(partitioning_config: FDPartitioning, metadata_df):
 
     partition_sizes = [2000] * partitioning_config.n_clients
+
+    # shuffle rows of the dataframe
     metadata_df = metadata_df \
         .sample(frac=1.0, replace=False, random_state=partitioning_config.seed) \
         .reset_index(drop=True)
@@ -192,13 +221,13 @@ def _generate_partitions_as_FD(partitioning_config: FDPartitioning, metadata_df)
         reduced = df.drop(index=drop).reset_index(drop=True).copy()
         assert (reduced["label"] == target_label).sum() == 5
 
-        train_idxs = np.random.choice(
+        test_idxs = np.random.choice(
             reduced.shape[0],
             size=int(reduced.shape[0] * partitioning_config.test_percentage),
             replace=False
         )
-        reduced_partitions["train"].append(reduced.loc[train_idxs].reset_index(drop=True))
-        reduced_partitions["test"].append(reduced.drop(index=train_idxs).reset_index(drop=True))
+        reduced_partitions["test"].append(reduced.loc[test_idxs].reset_index(drop=True))
+        reduced_partitions["train"].append(reduced.drop(index=test_idxs).reset_index(drop=True))
 
     return reduced_partitions["train"], reduced_partitions["test"]
 
@@ -223,6 +252,7 @@ def generate_partition(partitioning_config: PartitioningConfig):
         "dirichlet": _generate_dirichlet_partition,
         "shard": _generate_shards_partition,
         "fd": _generate_partitions_as_FD,
+        "iid": _generate_IID_partitions,
     }[partitioning_config.partitioning_method]
     trainsets, testsets = partitioning_fn(partitioning_config, metadata_df)
     _save_configs(trainsets, testsets, partition_folder)

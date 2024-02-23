@@ -1,3 +1,4 @@
+import copy
 from typing import Dict, List
 import unittest
 
@@ -9,7 +10,7 @@ import torch.nn.functional as F
 from src.helper.parameters import set_parameters
 from src.models.abstract_model import AbstratModel
 from src.models.pt_commons import aggregate_submodels
-from src.models.convnet import ConvNet
+from src.models.convnet import SmallConvNet, FedAvgMnistNet, FedDropoutNet
 
 
 class MLP(AbstratModel):
@@ -190,9 +191,59 @@ class ModelExtractionTests(unittest.TestCase):
             model.a.weight[0].allclose((submodel1.a.weight + submodel2.a.weight) / 2)
         )
 
+    def _get_config(self, model, rate):
+        capacity_config = model.get_reduced_model_config(rate)
+        client_submodel_config_idx = [torch.arange(c) for c in capacity_config]
+        expanded_config_idx = \
+            model.expand_configuration_to_model(client_submodel_config_idx)
+        config = expanded_config_idx
+        return config
+
+    def test_aggregate_modelc(self):
+        model = FedDropoutNet(10, 1.0)
+        model_copy = copy.deepcopy(model)
+
+        rate1, rate2 = 0.25, 0.5
+        submodel1 = FedDropoutNet(10, rate1)
+        submodel2 = FedDropoutNet(10, rate2)
+        config1, config2 = self._get_config(model, rate1), self._get_config(model, rate2)
+        updated_model_weights = \
+        aggregate_submodels(model, [submodel1, submodel2], [config1, config2])
+        set_parameters(model, updated_model_weights)
+
+        for smp1, smp2, p, op in zip(submodel1.parameters(), submodel2.parameters(), model.parameters(), model_copy.parameters()):
+            min_size1 = smp1.shape[0]
+
+            slice1_1 = slice(0, min_size1)
+            slice2_1 = slice(min_size1, smp2.shape[0])
+            slice3_1 = slice(smp2.shape[0], p.shape[0])
+            if p.ndim > 1:
+                min_size2 = smp1.shape[1]
+
+                slice1_2 = slice(0, min_size2)
+                slice1 = (slice1_1, slice1_2)
+
+                slice2_2 = slice(min_size2, smp2.shape[1])
+                slice2 = (slice2_1, slice2_2)
+
+                slice3_2 = slice(smp2.shape[1], p.shape[1])
+                slice3 = (slice3_1, slice3_2)
+
+                avg = (smp1[slice1] + smp2[slice1]) / 2
+                assert (avg == p[slice1]).all()
+                assert (smp2[slice2] == p[slice2]).all()
+                assert (p[slice3] == op[slice3]).all()
+
+            else:
+                avg = (smp1[slice1_1] + smp2[slice1_1]) / 2
+                assert (avg == p[slice1_1]).all()
+                assert (smp2[slice2_1] == p[slice2_1]).all()
+                assert (p[slice3_1] == op[slice3_1]).all()
+
+
     def test_extracting_convnet(self):
-        model = ConvNet(10, 1.0)
-        submodel = ConvNet(10, self.ratio)
+        model = SmallConvNet(10, 1.0)
+        submodel = SmallConvNet(10, self.ratio)
 
         submodel_config = model.get_reduced_model_config(self.ratio)
         submodel_config = [np.arange(conf) for conf in submodel_config]
@@ -225,5 +276,44 @@ class ModelExtractionTests(unittest.TestCase):
         t = model.fc3(t)
 
         self.assertTrue(
-            bool((t == submodel_pred).all())
+            bool(t.allclose(submodel_pred))
+        )
+
+    def test_extracting_fedavgmnistnet(self):
+        model = FedAvgMnistNet(10, 1.0)
+        submodel = FedAvgMnistNet(10, self.ratio)
+        model.scaler = nn.Identity()
+        submodel.scaler = nn.Identity()
+
+        # model.scaler = nn.Identity()
+        submodel_config = model.get_reduced_model_config(self.ratio)
+        submodel_config = [np.arange(conf) for conf in submodel_config]
+        submodel_config_expanded = model.expand_configuration_to_model(submodel_config)
+        submodel_parameters = model.extract_submodel_parameters(submodel_config_expanded)
+        set_parameters(submodel, submodel_parameters)
+
+        x = torch.randn(self.batch_size, 1, 28, 28)
+
+        submodel_pred = submodel(x)
+        wmc = model.whole_model_config
+        missings = []
+        for idx in range(1, len(submodel_config) - 1):
+            mx = wmc[idx]
+            missing = [i for i in range(mx) if i not in submodel_config[idx]]
+            missings.append(missing)
+
+        # compute output layer by layer by setting missing values to 0
+        t = model.conv1(x)
+        t[:,missings[0]] = 0.
+        t = model.pool(F.relu(t))
+        t = model.conv2(t)
+        t[:,missings[1]] = 0.
+        t = model.pool(F.relu(t))
+        t = t.view(self.batch_size, model.model_config[2] * model.flatten_expansion)
+        t = F.relu(model.fc1(t))
+        t[:,missings[2]] = 0.
+        t = model.fc2(t)
+
+        self.assertTrue(
+            bool(t.allclose(submodel_pred))
         )

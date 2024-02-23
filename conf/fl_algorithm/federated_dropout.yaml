@@ -1,4 +1,8 @@
 client:
   _target_: src.clients.pt_base_client.PtClient
+  evaluate_on_whole_model: false
+  constant_rate: null
 strategy:
   _target_: src.strategies.federated_dropout.FederatedDropout
+  evaluate_on_whole_model: false
+  constant_rate: null

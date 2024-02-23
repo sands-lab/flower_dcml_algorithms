@@ -66,18 +66,23 @@ def sync_rng_state(func):
     return wrapper
 
 
-def generate_wandb_config(cfg):
-    return {
-        "algorithm": cfg.fl_algorithm.strategy._target_.split(".")[-1],
-        "global_epochs": cfg.global_train.epochs,
-        "fraction_fit": cfg.global_train.fraction_fit,
-        "fraction_eval": cfg.global_train.fraction_eval,
-        "lr": cfg.local_train.lr,
-        "local_epochs": cfg.local_train.local_epochs,
-        "batch_size": cfg.local_train.batch_size,
-        "optimizer": cfg.local_train.optimizer,
-        "seed": cfg.general.seed,
-    }
+def generate_wandb_config(dict_conf):
+
+    algorithm = dict_conf["fl_algorithm"]["strategy"]["_target_"].split(".")[-1]
+    relevant_keys = ["data", "general", "local_train", "global_train"]
+    final_dict = {}
+    final_dict["algorithm"] = algorithm
+
+    for k in relevant_keys:
+        for inner_key in dict_conf[k]:
+            final_dict[f"{k}.{inner_key}"] = dict_conf[k][inner_key]
+    for entity in ["client", "strategy"]:
+        for k in dict_conf["fl_algorithm"][entity]:
+            if k == "_target_":
+                continue
+            final_dict[f"{entity}.{k}"] = dict_conf["fl_algorithm"][entity][k]
+
+    return final_dict
 
 
 def np_softmax(matrix: np.ndarray, axis: int):

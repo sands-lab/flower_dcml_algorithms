@@ -1,10 +1,12 @@
 {
     "base_models": {
-        "cifar10": "src.models.convnet.ConvNet"
+        "cifar10": "src.models.fully_conv_net.LargeAllConvNet",
+        "cinic": "src.models.fully_conv_net.LargeAllConvNet",
+        "mnist": "src.models.convnet.FedAvgMnistNet"
     },
     "capacity_mapping": {
         "0": 1.0,
         "1": 0.5,
-        "2": 0.25
+        "2": 0.2
     }
 }

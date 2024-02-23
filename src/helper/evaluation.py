@@ -8,7 +8,7 @@ import wandb
 class WandbEvaluation:
     def __init__(self, log_to_wandb) -> None:
         super().__init__()
-        self.epoch = 1
+        self.epoch = 0
         self.start_time = time.time()
         self.log_data = wandb.log if log_to_wandb else lambda *args: None
 
@@ -39,7 +39,7 @@ class WandbEvaluation:
 
         global_log_dict = {
             "dataset_size": sum(dataset_sizes),
-            "epoch": self.epoch,
+            "fl_epoch": self.epoch,
             "elapsed_time": time.time() - self.start_time,
             "fit_aggregation": fit_aggregation,
             "client_table": wandb_table
@@ -47,8 +47,6 @@ class WandbEvaluation:
         for k, v in metric_values.items():
             global_log_dict[k] = np.average(v, weights=dataset_sizes).item()
         self.log_data(global_log_dict)
-        self.epoch += 1
-
         return {"accuracy": np.average(metric_values["accuracy"], weights=dataset_sizes).item()}
 
     def eval_aggregation_fn(self, metrics):

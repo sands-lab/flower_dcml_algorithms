@@ -46,6 +46,7 @@ class BaseClient(fl.client.NumPyClient):
         self.images_folder = images_folder
         self.partition_folder = partition_folder
         self._init_model()
+        self.measure_accuracy_on_public_dataset = False  # only for reproducibility purposes
         save_rng_state_if_not_exists(self.client_working_folder)
         log(INFO, "Initialed client %s [model %s] on %s...", cid,
             self.model.__class__.__name__, self.device)
@@ -75,17 +76,29 @@ class BaseClient(fl.client.NumPyClient):
 
     def _init_dataloader(self, train, batch_size, metadata=None):
         dataset = self._init_dataset(train, metadata)
-        dataloader = DataLoader(dataset, batch_size=batch_size, shuffle=train)
+        dataloader = DataLoader(dataset, batch_size=batch_size, shuffle=train, pin_memory=True)
         return dataloader
 
     def _init_dataset(self, train, metadata):
-        if train:
-            transforms = T.Compose([T.ToTensor(), T.RandomHorizontalFlip()])
+        transforms = [T.ToTensor()]
+        if self.dataset_name == "cifar10":
+            transforms.append(T.Normalize(mean=(0.4914, 0.4822, 0.4465), std=(0.247, 0.243, 0.261)))
+        elif self.dataset_name == "mnist":
+            transforms.append(T.Normalize((0.1307,), (0.3081,)))
+        elif self.dataset_name == "cinic":
+            transforms.append(T.Normalize(mean=(0.4788, 0.4722, 0.4304), std=(0.242, 0.238, 0.259)))
         else:
-            transforms = T.ToTensor()
+            raise Exception()
+        if train and self.dataset_name not in {"mnist"}:
+            transforms.append(T.RandomHorizontalFlip())
+        transforms = T.Compose(transforms)
 
         partition = "train" if train else "test"
-        partition_file = f"{self.partition_folder}/partition_{self.cid}_{partition}.csv"
+        if not train and self.measure_accuracy_on_public_dataset:
+            filename = "public_dataset.csv"
+        else:
+            filename = f"partition_{self.cid}_{partition}.csv"
+        partition_file = f"{self.partition_folder}/{filename}"
         dataset = CustomDataset(self.images_folder,
                                 partition_csv=partition_file,
                                 transforms=transforms,
@@ -103,16 +116,15 @@ class BaseClient(fl.client.NumPyClient):
     def save_model_to_disk(self):
         assert self.stateful_client, \
             "Saving model to disk is possible only if using stateful clients!!"
-        start_time = time.time()
         torch.save(self.model.state_dict(), self.model_save_file)
-        log(INFO, "Model saving time: %f", time.time() - start_time)
 
-    def get_optimization_config(self, trainloader, config):
+    def get_optimization_config(self, trainloader, config, **kwargs):
         return OptimizationConfig(
             model=self.model,
             dataloader=trainloader,
             optimizer_name=config["optimizer"],
             epochs=config["local_epochs"],
             lr=config["lr"],
-            device=self.device
+            device=self.device,
+            **kwargs
         )

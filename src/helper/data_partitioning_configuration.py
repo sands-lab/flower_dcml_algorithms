@@ -49,3 +49,8 @@ class ShardsPartitioning(PartitioningConfig):
 @dataclass
 class FDPartitioning(PartitioningConfig):
     pass
+
+
+@dataclass
+class IIDPartitioning(PartitioningConfig):
+    pass

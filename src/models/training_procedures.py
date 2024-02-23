@@ -1,3 +1,4 @@
+import copy
 
 import numpy as np
 import torch
@@ -14,20 +15,31 @@ def _iterate_dataloader(optimization_config: OptimizationConfig):
             yield data
 
 
-def train(optimization_config: OptimizationConfig):
+def _clip_gradient(model, config):
+    torch.nn.utils.clip_grad_norm_(model.parameters(), config.grad_norm_clipping_param)
 
+
+def compute_proximal_term(model, global_model, mu):
+    proximal_term = 0.0
+    for local_weights, global_weights in zip(model.parameters(), global_model.parameters()):
+        proximal_term += torch.square((local_weights - global_weights).norm(2))
+    return (mu / 2) * proximal_term
+
+
+
+def train(optimization_config: OptimizationConfig):
     model = optimization_config.model
     optimizer = optimization_config.optimizer
 
     criterion = torch.nn.CrossEntropyLoss()
-
     for data, targets in _iterate_dataloader(optimization_config):
-
         preds = model(data)
         loss = criterion(preds, targets)
+        assert torch.isfinite(loss).all()
 
         model.zero_grad()
         loss.backward()
+        _clip_gradient(model, optimization_config)
         optimizer.step()
 
 
@@ -41,14 +53,11 @@ def train_fpx(optimization_config: OptimizationConfig, global_model, mu):
     for data, targets in _iterate_dataloader(optimization_config):
         preds = model(data)
         loss = criterion(preds, targets)
-
-        proximal_term = 0.0
-        for local_weights, global_weights in zip(model.parameters(), global_model.parameters()):
-            proximal_term += torch.square((local_weights - global_weights).norm(2))
-        loss += (mu / 2) * proximal_term
+        loss += compute_proximal_term(model, global_model, mu)
 
         model.zero_grad()
         loss.backward()
+        _clip_gradient(model, optimization_config)
         optimizer.step()
 
 
@@ -72,16 +81,27 @@ def train_fd(
     logit_matrix = logit_matrix.to(optimization_config.device)
     cnts = torch.zeros((num_classes,)).to(optimization_config.device)
     running_sums = torch.zeros((num_classes, num_classes)).to(optimization_config.device)
+    if not empty_logit_matrix:
+        valid_logits = (logit_matrix >= 0).all(axis=1).nonzero(as_tuple=True)[0]
+        if len(valid_logits) < num_classes:
+            missing_labels = set(range(num_classes)) - set(valid_logits.tolist())
+            print(f"WARNING: the following logits are missing: {missing_labels}")
 
     for data, targets in _iterate_dataloader(optimization_config):
         preds = model(data)
         loss = criterion(preds, targets)
         if not empty_logit_matrix:
             # CrossEntropyLoss performs softmax internally, so no need to call the softmax here
-            loss += kd_weight * criterion(preds / temperature, logit_matrix[targets])
+            assert not torch.isnan(preds).any()
+            assert not torch.isnan(criterion(preds / temperature, logit_matrix[targets])), f"{preds}, \n\n {logit_matrix[targets]}\n\n\n"
+            mask = torch.isin(targets, valid_logits)
+            targets_ = targets[mask]
+            preds_ = preds[mask,:]
+            loss += kd_weight * criterion(preds_ / temperature, logit_matrix[targets_])
 
         model.zero_grad()
         loss.backward()
+        _clip_gradient(model, optimization_config)
         optimizer.step()
 
         cnts += torch.bincount(targets, minlength=num_classes)
@@ -174,11 +194,11 @@ def train_fedgkt_server(model, dataloaders, optimizer_name, epochs, lr, device, 
                     optimizer.step()
 
 
-def train_kd_ds_fl(optimization_config: OptimizationConfig):
+def train_kd_ds_fl(optimization_config: OptimizationConfig, kd_temperature):
     model = optimization_config.model
     optimizer = optimization_config.optimizer
 
-    criterion = KLLoss(2.0)  # which loss function should be used?
+    criterion = KLLoss(kd_temperature)  # which loss function should be used?
 
     for images, target_logits in _iterate_dataloader(optimization_config):
         pred_logits = model(images)
@@ -187,57 +207,40 @@ def train_kd_ds_fl(optimization_config: OptimizationConfig):
 
         model.zero_grad()
         loss.backward()
+        _clip_gradient(model, optimization_config)
         optimizer.step()
 
 
-def train_feddf(optimization_config: OptimizationConfig, temperature, teacher_models):
+def train_feddf(optimization_config: OptimizationConfig, temperature):
     # model is the student (server) model
     # train with AVGLOGITS (page 3 in the paper)
 
     model = optimization_config.model
     optimizer = optimization_config.optimizer
-
-    for model in teacher_models:
-        model.eval()
-        model.to(optimization_config.device)
-
+    global_model = copy.deepcopy(model)
     criterion = KLLoss(temperature)
 
-    for _ in range(optimization_config.epochs):
-        for images in optimization_config.dataloader:
-            images = images.to(optimization_config.device)
+    for images, teacher_consensus in _iterate_dataloader(optimization_config):
+        student_predictions = model(images)
 
-            teacher_predictions = []
-            with torch.no_grad():
-                for teacher_model in teacher_models:
-                    teacher_predictions.append(
-                        teacher_model(images).unsqueeze(0)
-                    )
-            teacher_predictions = torch.mean(
-                torch.vstack(teacher_predictions), axis=0
-            )
-            student_predictions = model(images)
+        loss = criterion(student_predictions, teacher_consensus)  # in the paper it seems they do the opposite but it is strange...
+        loss += compute_proximal_term(model, global_model, 0.0001)
+        assert torch.isfinite(loss).all()
 
-            loss = criterion(student_predictions, teacher_predictions)
-
-            model.zero_grad()
-            loss.backward()
-            optimizer.step()
+        model.zero_grad()
+        loss.backward()
+        _clip_gradient(model, optimization_config)
+        optimizer.step()
 
 
 def train_model_layers(optimization_config: OptimizationConfig, train_layers, gd_steps: int):
     model = optimization_config.model
-    optimizer = init_optimizer(
-        model,
-        optimization_config.optimizer_name,
-        lr=optimization_config.lr
-    )
+    optimizer = optimization_config.optimizer
     for k, v in model.state_dict().items():
         v.requires_grad = k in train_layers
     criterion = torch.nn.CrossEntropyLoss()
 
-    i = 0
-    for images, target_logits in _iterate_dataloader(optimization_config):
+    for i, (images, target_logits) in enumerate(_iterate_dataloader(optimization_config)):
         pred_logits = model(images)
 
         loss = criterion(pred_logits, target_logits)
@@ -246,7 +249,6 @@ def train_model_layers(optimization_config: OptimizationConfig, train_layers, gd
         loss.backward()
         optimizer.step()
 
-        i += 1
         if gd_steps is not None and i >= gd_steps:
             break
 

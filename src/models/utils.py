@@ -11,8 +11,8 @@ class KLLoss(nn.Module):
     def forward(self, output_batch, teacher_outputs):
 
         output_batch = F.log_softmax(output_batch / self.T, dim=1)
-        teacher_outputs = F.softmax(teacher_outputs / self.T, dim=1) + 10 ** (-7)
+        teacher_outputs = F.softmax(teacher_outputs / self.T, dim=1) + (10 ** (-10))
 
-        loss = self.T * self.T * self.kl_loss(output_batch, teacher_outputs)
+        loss = self.kl_loss(output_batch, teacher_outputs)
 
         return loss

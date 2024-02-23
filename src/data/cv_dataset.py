@@ -5,7 +5,7 @@ import numpy as np
 import pandas as pd
 import torch
 from torch.utils.data import Dataset
-from torchvision.transforms import ToTensor
+import torchvision.transforms as T
 
 
 class CustomDataset(Dataset):
@@ -46,12 +46,16 @@ class UnlabeledDataset(Dataset):
         self.filepaths = pd.read_csv(f"{dataset_home_folder}/metadata.csv")["filename"]\
             .sample(dataset_size, replace=False).to_list()
         self.dataset_home_folder = dataset_home_folder
-        self.to_tensor = ToTensor()
+        self.transforms = T.Compose([
+            T.ToTensor(),
+            T.Normalize(mean=(0.4914, 0.4822, 0.4465), std=(0.247, 0.243, 0.261)),
+            T.RandomHorizontalFlip()
+        ])
 
     def __len__(self):
         return len(self.filepaths)
 
     def __getitem__(self, idx):
         image = Image.open(f"{self.dataset_home_folder}/{self.filepaths[idx]}")
-        image = self.to_tensor(image)
+        image = self.transforms(image)
         return image

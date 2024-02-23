@@ -21,6 +21,14 @@ cs = ConfigStore.instance()
 cs.store(name="config", node=ParamConfig)
 
 
+def access_config(config, key_string):
+    keys = key_string.split('.')  # Split the string by delimiter ('.')
+    value = config
+    for key in keys:
+        value = value[key]  # Traverse the nested structure
+    return value
+
+
 @hydra.main(version_base=None, config_path="conf", config_name="base_config")
 def run(cfg: ParamConfig):
     print(cfg)
@@ -33,7 +41,8 @@ def run(cfg: ParamConfig):
     data_config = load_data_config(partition_folder)
     n_classes = {
         "cifar10": 10,
-        "mnist": 10
+        "mnist": 10,
+        "cinic": 10
     }[data_config["dataset_name"]]
 
     print(os.environ.get("LOG_TO_WANDB"))
@@ -42,11 +51,19 @@ def run(cfg: ParamConfig):
     fl_algorithm_name = cfg.fl_algorithm.strategy._target_.split(".")[-1]
 
     if log_to_wandb:
+        extract = lambda k: k.split(".")[-1]
+        constants = list(cfg.logging.constants)
+        print(constants)
+        wandb_name = "_".join(
+            [fl_algorithm_name] +
+            (constants if isinstance(constants, list) else [constants]) +
+            [f"{extract(k)}{access_config(cfg, k)}" for k in cfg.logging.name_keys]
+        )
         print("Logging to wandb...")
-        wandb_config_dict = generate_wandb_config(cfg) | data_config
+        wandb_config_dict = generate_wandb_config(OmegaConf.to_container(cfg)) | data_config
         wandb.init(
             config=wandb_config_dict,
-            name=fl_algorithm_name
+            name=wandb_name
         )
     evaluator = WandbEvaluation(log_to_wandb)
 
@@ -63,7 +80,7 @@ def run(cfg: ParamConfig):
         min_available_clients=1,
         evaluate_metrics_aggregation_fn=evaluator.eval_aggregation_fn,
         fit_metrics_aggregation_fn=evaluator.fit_aggregation_fn,
-        on_fit_config_fn=construct_config_fn(OmegaConf.to_container(cfg.local_train))
+        on_fit_config_fn=construct_config_fn(OmegaConf.to_container(cfg.local_train), evaluator)
     )
 
     with tempfile.TemporaryDirectory(dir="data/client") as temp_dir:
@@ -82,26 +99,23 @@ def run(cfg: ParamConfig):
             "seed": cfg.general.seed,
             "experiment_folder": temp_dir
         }
-        if strategy.__class__.__name__ in {"FedAvg", "FedProx"}:
-            # these are the only strategies in which all the clients have the
-            # very same model architecture the model capacity should be set in
-            # the config file rather than being injected by the runtime
-            client_fn_ = partial(client_fn, **common_kwargs)
-        else:
-            random_client_capacities = \
-                init_client_id_to_capacity_mapping(data_config["n_clients"], 2)
-            client_id_to_capacity_mapping_file = f"{temp_dir}/model_capacities.json"
-            with open(client_id_to_capacity_mapping_file, "w") as fp:
-                json.dump(random_client_capacities, fp)
+        random_client_capacities = \
+            init_client_id_to_capacity_mapping(
+                data_config["n_clients"],
+                3,
+                fixed_capacity=cfg.general.common_client_capacity
+            )
 
-            if strategy.__class__.__name__ in {"FedDF", "HeteroFL", "FederatedDropout"}:
-                strategy.set_client_capacity_mapping(client_id_to_capacity_mapping_file)
-                strategy.set_dataset_name(data_config["dataset_name"])
+        client_id_to_capacity_mapping_file = f"{temp_dir}/model_capacities.json"
+        with open(client_id_to_capacity_mapping_file, "w") as fp:
+            json.dump(random_client_capacities, fp)
+        strategy.set_client_capacity_mapping(client_id_to_capacity_mapping_file)
+        strategy.set_dataset_name(data_config["dataset_name"])
 
-            client_fn_ = partial(inject_model_capacity,
-                                 client_fn=client_fn,
-                                 client_capacities=random_client_capacities,
-                                 **common_kwargs)
+        client_fn_ = partial(inject_model_capacity,
+                             client_fn=client_fn,
+                             client_capacities=random_client_capacities,
+                             **common_kwargs)
 
         fl.simulation.start_simulation(
             client_fn=client_fn_,
@@ -116,8 +130,8 @@ def run(cfg: ParamConfig):
 
 
 if __name__ == "__main__":
-    torch.backends.cudnn.deterministic = True
-    torch.backends.cudnn.benchmark = False
+    # torch.backends.cudnn.deterministic = True
+    # torch.backends.cudnn.benchmark = False
     load_dotenv(override=True)
     load_dotenv("secrets.env", override=True)
     run()

@@ -3,4 +3,5 @@ client:
   client_capacity: 0
 strategy:
   _target_: src.strategies.fedprox.FedProx
-  proximal_mu: 0.01
+  proximal_mu: 0.0005
+  filter_capacity: null

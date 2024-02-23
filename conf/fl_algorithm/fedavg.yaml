@@ -1,5 +1,5 @@
 client:
   _target_: src.clients.fedavg_client.client_fn
-  client_capacity: 0
 strategy:
   _target_: src.strategies.fedavg.FedAvg  # target + kwargs passed to initialization
+  filter_capacity: null

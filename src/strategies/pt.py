@@ -13,7 +13,6 @@ from src.models.pt_commons import aggregate_submodels
 from src.models.abstract_model import AbstratModel
 from src.strategies.fedavg import FedAvg
 from src.strategies.commons import (
-    set_client_capacity_mapping,
     get_config,
     sample_clients,
     aggregate_fit_wrapper
@@ -22,20 +21,20 @@ from src.helper.parameters import set_parameters, get_parameters
 
 
 class PT(FedAvg):
-    def __init__(self, **kwargs):
+    def __init__(self, evaluate_on_whole_model, constant_rate, **kwargs):
         super().__init__(**kwargs)
         self.model = None
         self.dataset_name = None
         self.round_submodel_configs = None
         self.client_to_capacity_mapping = None
+        self.evaluate_on_whole_model = evaluate_on_whole_model
+        self.constant_rate = constant_rate
         self.set_capacity_to_rate_mapping()
-
-    def set_dataset_name(self, dataset_name):
-        self.dataset_name = dataset_name
 
     def initialize_parameters(self, client_manager):
         self.model: AbstratModel = \
-            init_pt_model(0, self.n_classes, torch.device("cpu"), self.dataset_name)
+            init_pt_model(0, self.n_classes, torch.device("cpu"), self.dataset_name, None)
+        # torch.save(self.model.state_dict(), "tmp/initial_model.pth")
         return ndarrays_to_parameters(get_parameters(self.model))
 
     def setup_round(self, server_round, n_round_clients):
@@ -45,11 +44,8 @@ class PT(FedAvg):
         # to override this method
         pass
 
-    def configure_client_submodel(self, whole_model_config, reduced_model_config):
+    def configure_client_submodel(self, idx, whole_model_config, reduced_model_config):
         raise NotImplementedError("This method should be overwritten by the specific algorithm")
-
-    def set_client_capacity_mapping(self, filepath):
-        self.client_to_capacity_mapping = set_client_capacity_mapping(filepath)
 
     def set_capacity_to_rate_mapping(self):
         with open("pt_model_config.json", "r") as fp:
@@ -57,6 +53,8 @@ class PT(FedAvg):
         self.capacity_to_rate_mapping = config["capacity_mapping"]
 
     def _get_client_rate(self, cid):
+        if self.constant_rate is not None:
+            return self.constant_rate
         client_capacity = self.client_to_capacity_mapping[cid]
         client_rate = self.capacity_to_rate_mapping[str(client_capacity)]
         return client_rate
@@ -64,11 +62,12 @@ class PT(FedAvg):
     def _extract_submodel_params(self, clients):
         client_submodels = []
         round_submodel_configs = {}
-        for client in clients:
+        for idx, client in enumerate(clients):
             cid = client.cid
             client_rate = self._get_client_rate(cid)
             capacity_config = self.model.get_reduced_model_config(client_rate)
             client_submodel_config_idx = self.configure_client_submodel(
+                idx,
                 self.model.whole_model_config,
                 capacity_config
             )
@@ -78,7 +77,7 @@ class PT(FedAvg):
             client_submodel_parameters = \
                 self.model.extract_submodel_parameters(expanded_config_idx)
             client_submodels.append(client_submodel_parameters)
-            print(cid, sum(p.size for p in client_submodel_parameters))
+            print("Extracted model for ", cid, ", # parameters: ", sum(p.size for p in client_submodel_parameters))
         return client_submodels, round_submodel_configs
 
     def configure_fit(
@@ -104,15 +103,14 @@ class PT(FedAvg):
         submodels_list, submodel_configs = [], []
         for client, client_res in results:
             submodel_params = parameters_to_ndarrays(client_res.parameters)
-
             submodel = init_pt_model(
                 client_capacity=self.client_to_capacity_mapping[client.cid],
                 n_classes=self.n_classes,
                 device=torch.device("cpu"),
-                dataset=self.dataset_name
+                dataset=self.dataset_name,
+                rate=self.constant_rate
             )
             set_parameters(submodel, submodel_params)
-
             submodels_list.append(submodel)
             submodel_configs.append(self.round_submodel_configs[client.cid])
 
@@ -126,9 +124,8 @@ class PT(FedAvg):
     ):
         if not self.evaluate_round(server_round):
             return []
-        # overthinkinh... can remove it
-        assert all(bool((a == b).all())
-                   for a, b in zip(parameters_to_ndarrays(parameters), get_parameters(self.model)))
+        if self.evaluate_on_whole_model:
+            return super().configure_evaluate(server_round, parameters, client_manager)
 
         clients = sample_clients(self, client_manager)
         config = get_config(self, server_round)

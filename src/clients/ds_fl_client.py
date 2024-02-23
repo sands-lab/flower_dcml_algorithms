@@ -12,11 +12,13 @@ from src.helper.commons import sync_rng_state
 # pylint: disable=C0103
 class DS_FLClient(BaseClient):
 
-    def __init__(self, **kwargs):
+    def __init__(self, kd_temperature, **kwargs):
         super().__init__(**kwargs, stateful_client=True)
         self.public_dataset_file = f"{self.client_working_folder}/public_dataset.pth"
+        self.kd_temperature = kd_temperature
 
     def _get_public_dataset_logits(self):
+        self.model.eval()
         dataset = torch.load(self.public_dataset_file)
         dataloader = DataLoader(dataset, batch_size=32, shuffle=False)
         logits = []
@@ -25,14 +27,16 @@ class DS_FLClient(BaseClient):
             with torch.no_grad():
                 preds = self.model(batch)
             assert preds.ndim == 2
-            l = torch.nn.functional.softmax(preds, dim=0).cpu().numpy()
-            logits.append(l)
+            # l = torch.nn.functional.softmax(preds, dim=1).clone().cpu().numpy()
+            logits.append(preds.clone().cpu().numpy())
         logits = np.vstack(logits)
+        assert logits.shape == (len(dataset), 10)
         return logits
 
     def _get_kd_trainloader(self, public_logits, batch_size):
         # construct a dataloader using the logits received from the server and the dataset on FS
         images = torch.load(self.public_dataset_file).tensors[0]
+        assert images.shape[0] == public_logits.shape[0]
         dataset = TensorDataset(
             images,
             torch.from_numpy(public_logits)
@@ -58,7 +62,7 @@ class DS_FLClient(BaseClient):
             # perform knowledge distillation
             public_trainloader = self._get_kd_trainloader(parameters[0], config["batch_size"])
             train_kd_ds_fl(
-                self.get_optimization_config(public_trainloader, config)
+                self.get_optimization_config(public_trainloader, config), self.kd_temperature
             )
             del public_trainloader
 

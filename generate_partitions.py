@@ -8,13 +8,14 @@ from src.data.partitioning import download_data, generate_partition
 from src.helper.data_partitioning_configuration import (
     DirichletPartitioning,
     ShardsPartitioning,
-    FDPartitioning
+    FDPartitioning,
+    IIDPartitioning
 )
 
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--dataset_name", type=str, required=True, choices=["mnist", "cifar10"],
+    parser.add_argument("--dataset_name", type=str, required=True, choices=["mnist", "cifar10", "cifar100", "cinic"],
                         help="Name of the dataset to be used")
     parser.add_argument("--n_clients", type=int, required=True,
                         help="Number of clients to be generated")
@@ -24,7 +25,7 @@ def main():
                         help="Seed for reproducibility")
     parser.add_argument("--test_percentage", type=float, required=True,
                         help="Percentage of data that every clients reserves as test set")
-    parser.add_argument("--partitioning_method", type=str, required=True, choices=["dirichlet", "shard", "fd"],
+    parser.add_argument("--partitioning_method", type=str, required=True, choices=["dirichlet", "shard", "fd", "iid"],
                         help="Partitioning algorithm to be used. Use dirichlet with high alpha (100) for iid")
     parser.add_argument("--alpha", type=float, required=False,
                         help="Parameter for the dirichlet distribution")
@@ -45,7 +46,8 @@ def main():
     partition_config_class = {
         "dirichlet": DirichletPartitioning,
         "shard": ShardsPartitioning,
-        "fd": FDPartitioning
+        "fd": FDPartitioning,
+        "iid": IIDPartitioning
     }[args["partitioning_method"]]
     partition_config = partition_config_class(**args)
 
