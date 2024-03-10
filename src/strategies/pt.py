@@ -48,7 +48,7 @@ class PT(FedAvg):
         raise NotImplementedError("This method should be overwritten by the specific algorithm")
 
     def set_capacity_to_rate_mapping(self):
-        with open("pt_model_config.json", "r") as fp:
+        with open("config/models/pt_model_config.json", "r") as fp:
             config = json.load(fp)
         self.capacity_to_rate_mapping = config["capacity_mapping"]
 
@@ -83,6 +83,8 @@ class PT(FedAvg):
     def configure_fit(
             self, server_round: int, parameters, client_manager
     ):
+        if self.converged:
+            return []
         # overthinking, will remove
         assert all(bool((a == b).all())
                    for a, b in zip(parameters_to_ndarrays(parameters), get_parameters(self.model)))

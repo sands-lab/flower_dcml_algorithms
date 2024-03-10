@@ -5,6 +5,7 @@ import numpy as np
 from src.models.training_procedures import train
 from src.clients.base_client import BaseClient
 from src.helper.commons import sync_rng_state
+from src.data.dataset_partition import DatasetPartition
 
 
 def handle_early_stopping(accuracy, file):
@@ -37,7 +38,10 @@ class PrivateTrainingClient(BaseClient):
     def fit(self, parameters, config):
         _ = (parameters,)
         if self.train:
-            trainloader = self._init_dataloader(train=True, batch_size=config["batch_size"])
+            trainloader = self._init_dataloader(
+                dataset_partition=DatasetPartition.TRAIN,
+                batch_size=config["batch_size"]
+            )
             train(
                 self.get_optimization_config(trainloader, config, weight_decay=self.weight_decay)
             )

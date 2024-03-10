@@ -1,0 +1,5 @@
+strategy:
+  _target_: sl
+  single_training_client: true
+client:
+  _target_: sl

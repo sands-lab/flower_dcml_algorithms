@@ -1,0 +1,4 @@
+{
+    "cifar10": "src.models.fully_conv_net.MicroAllConvNet",
+    "cinic": "src.models.fully_conv_net.MicroAllConvNet"
+}

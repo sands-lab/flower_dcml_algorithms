@@ -9,8 +9,10 @@ class PartitioningConfig:
     seed: int
     holdout_set_size: int
     test_percentage: float
+    val_percentage: float
     raw_data_folder: str
     partitions_home_folder: str
+    fixed_training_set_size: int
 
     def get_config_str(self):
         common_config_lst = [
@@ -18,8 +20,11 @@ class PartitioningConfig:
             f"{self.n_clients}clients",
             f"{self.seed}seed",
             f"{self.test_percentage}test",
+            f"{self.val_percentage}val",
             f"{self.holdout_set_size}holdoutsize"
         ]
+        if self.fixed_training_set_size > 0:
+            common_config_lst.append(f"{self.fixed_training_set_size}trainsize")
         common_config = "_".join(common_config_lst)
         return common_config
 

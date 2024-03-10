@@ -1,0 +1,6 @@
+client:
+  _target_: src.clients.fd_client.client_fn
+  kd_weight: 0.5
+  temperature: 1.0
+strategy:
+  _target_: src.strategies.fd.FD

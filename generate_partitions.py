@@ -25,6 +25,8 @@ def main():
                         help="Seed for reproducibility")
     parser.add_argument("--test_percentage", type=float, required=True,
                         help="Percentage of data that every clients reserves as test set")
+    parser.add_argument("--val_percentage", type=float, required=True,
+                        help="Percentage of data that every clients reserves as val set")
     parser.add_argument("--partitioning_method", type=str, required=True, choices=["dirichlet", "shard", "fd", "iid"],
                         help="Partitioning algorithm to be used. Use dirichlet with high alpha (100) for iid")
     parser.add_argument("--alpha", type=float, required=False,
@@ -33,6 +35,9 @@ def main():
                         help="Parameter for the dirichlet distribution")
     parser.add_argument("--n_shards", type=int, required=False,
                         help="Number of classes each client should possess")
+    parser.add_argument("--fixed_training_set_size", type=int, required=False, default=-1,
+                        help="Fixed size of the training dataset")
+
     args = parser.parse_args()
     args = {k: v for k, v in vars(args).items() if v is not None}
 

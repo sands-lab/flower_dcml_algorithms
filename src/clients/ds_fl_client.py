@@ -7,6 +7,7 @@ from torch.utils.data import DataLoader, TensorDataset
 from src.models.training_procedures import train, train_kd_ds_fl
 from src.clients.base_client import BaseClient
 from src.helper.commons import sync_rng_state
+from src.data.dataset_partition import DatasetPartition
 
 
 # pylint: disable=C0103
@@ -67,7 +68,10 @@ class DS_FLClient(BaseClient):
             del public_trainloader
 
         # train on private dataset
-        trainloader = self._init_dataloader(train=True, batch_size=config["batch_size"])
+        trainloader = self._init_dataloader(
+            dataset_partition=DatasetPartition.TRAIN,
+            batch_size=config["batch_size"]
+        )
         train(
             self.get_optimization_config(trainloader, config)
         )

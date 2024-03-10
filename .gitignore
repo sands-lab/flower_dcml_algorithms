@@ -3,6 +3,7 @@ __pycache__/
 dcgm/
 outputs/
 wandb/
+artifacts/
 secrets.env
 
 *.log
@@ -13,3 +14,7 @@ secrets.env
 *.out
 *.err
 *.ipynb
+*.csv
+
+# specific files
+jupyter.sh

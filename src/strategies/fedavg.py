@@ -14,6 +14,7 @@ class FedAvg(FlFedAvg):
         self.n_classes = n_classes
         self.evaluation_freq = evaluation_freq
         self.filter_capacity = filter_capacity
+        self.converged = False
         self.client_to_capacity_mapping = None
         self.available_model_capacities = None
         self.dataset_name = None
@@ -62,12 +63,20 @@ class FedAvg(FlFedAvg):
         return super().aggregate_fit(server_round, results, failures)
 
     def evaluate_round(self, server_round):
-        return server_round % self.evaluation_freq == 0
+        return server_round % self.evaluation_freq == 0 and not self.converged
+
+    def configure_fit(self, *args, **kwargs):
+        if self.converged:
+            return []
+        return super().configure_fit(*args, **kwargs)
 
     def configure_evaluate(
         self, server_round: int, parameters, client_manager
     ):
-        eval_res = []
+        eval_ins = []
         if self.evaluate_round(server_round):
-            eval_res = super().configure_evaluate(server_round, parameters, client_manager)
-        return eval_res
+            eval_ins = super().configure_evaluate(server_round, parameters, client_manager)
+        return eval_ins
+
+    def set_converged(self):
+        self.converged = True

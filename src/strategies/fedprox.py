@@ -12,6 +12,8 @@ class FedProx(FedAvg):
     def configure_fit(
         self, server_round, parameters, client_manager
     ):
+        if self.converged:
+            return []
         client_config_pairs = super().configure_fit(
             server_round, parameters, client_manager
         )

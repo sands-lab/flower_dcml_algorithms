@@ -1,0 +1,36 @@
+defaults:
+  - fl_algorithm: fedavg
+  - _self_
+
+data:
+  dataset: cifar10
+  partitioning_configuration: iid_21clients_1602seed_0.25test_0holdoutsize
+global_train:  # parameters passed to the strategy during initialization
+  epochs: 100
+  evaluation_freq: 5
+  fraction_fit: 1.0
+  fraction_eval: 1.0
+local_train:  # passed to the client in the config file
+  lr: 0.05
+  local_epochs: 2
+  batch_size: 12
+  optimizer: sgd
+general:
+  seed: 10
+  common_client_capacity: null
+  separate_val_test_sets: false
+ray_client_resources:
+  num_cpus: 2
+  num_gpus: 0.16
+logging:
+  name_keys: # use [] if no log name values apart from fl_algorithm name
+    - "fl_algorithm.client.common_client_capacity"
+    - "local_train.local_epochs"
+    - "local_train.lr"
+    - "local_train.batch_size"
+  constants: []
+
+hydra:
+  output_subdir: null
+  run:
+    dir: .

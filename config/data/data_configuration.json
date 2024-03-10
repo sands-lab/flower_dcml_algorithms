@@ -1,0 +1,34 @@
+{
+    "cifar10": {
+        "type": "cv",
+        "normalization_parameters": {
+            "mean": [0.4914, 0.4822, 0.4465],
+            "std": [0.247, 0.243, 0.261]
+        },
+        "n_classes": 10
+    },
+    "cifar100": {
+        "type": "cv",
+        "normalization_parameters": {
+            "mean": [0.5071, 0.4867, 0.4408],
+            "std": [0.2675, 0.2565, 0.2761]
+        },
+        "n_classes": 100
+    },
+    "cinic": {
+        "type": "cv",
+        "normalization_parameters": {
+            "mean": [0.4788, 0.4722, 0.4304],
+            "std": [0.242, 0.238, 0.259]
+        },
+        "n_classes": 10
+    },
+    "mnist": {
+        "type": "cv",
+        "normalization_parameters": {
+            "mean": [0.1307],
+            "std": [0.3081]
+        },
+        "n_classes": 10
+    }
+}

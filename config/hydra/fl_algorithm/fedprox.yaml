@@ -1,0 +1,7 @@
+client:
+  _target_: src.clients.fedprox_client.client_fn
+  client_capacity: 0
+strategy:
+  _target_: src.strategies.fedprox.FedProx
+  proximal_mu: 0.0001
+  filter_capacity: null

@@ -3,6 +3,7 @@ from flwr.common import (
     EvaluateIns,
     FitIns,
     Parameters,
+    GetParametersIns,
     parameters_to_ndarrays,
     ndarrays_to_parameters
 )
@@ -10,7 +11,6 @@ from flwr.server.client_manager import ClientManager
 from flwr.server.strategy.aggregate import aggregate
 
 from src.helper.parameters import get_parameters, set_parameters
-from src.helper.commons import set_seed
 from src.helper.optimization_config import OptimizationConfig
 from src.models.training_procedures import train_feddf
 from src.models.helper import init_model
@@ -48,21 +48,18 @@ class FedDF(FedProx):
         # its value will be set in self.initialize_parameters(...)
         self.model_arrays = None
 
-    def __init_model(self, capacity):
-        set_seed(10)
-        return init_model(capacity, self.n_classes, torch.device("cpu"), self.dataset_name)
-
-    def _init_models(self):
-        return [
-            self.__init_model(capacity)
-            for capacity in self.available_model_capacities
-        ]
-
     def initialize_parameters(self, client_manager: ClientManager) -> Parameters:
-        models = self._init_models()
-        model_arrays = [
-            get_parameters(model) for model in models
-        ]
+        noins = GetParametersIns({})
+        clients = client_manager.all()
+        model_arrays = []
+        for capacity in self.available_model_capacities:
+            for _, client in clients.items():
+                if self.client_to_capacity_mapping[client.cid] == capacity:
+                    model_arrays.append(
+                        parameters_to_ndarrays(client.get_parameters(noins, None).parameters)
+                    )
+                    break
+
         self.model_lens = [len(ma) for ma in model_arrays]
         self.model_arrays = model_arrays
         return ndarrays_to_parameters(
@@ -99,6 +96,8 @@ class FedDF(FedProx):
     def configure_fit(
             self, server_round: int, parameters: Parameters, client_manager: ClientManager
     ):
+        if self.converged:
+            return []
         config = get_config(self, server_round)
         config["proximal_mu"] = self.proximal_mu
         clients = sample_clients(self, client_manager)
@@ -114,8 +113,8 @@ class FedDF(FedProx):
             self.public_dataset_name,
             self.public_dataset_size
         )
-        dataloader = torch.utils.data.DataLoader(dataset, batch_size=64, pin_memory=True,
-                                                 shuffle=False, drop_last=False)
+        dataloader = torch.utils.data.DataLoader(dataset, batch_size=128, pin_memory=True,
+                                                 shuffle=False, drop_last=True, num_workers=4)
         if self.weight_predictions:
             weights = torch.Tensor([
                 {
@@ -147,9 +146,15 @@ class FedDF(FedProx):
         all_images = torch.vstack(all_images).requires_grad_(False)
 
         dataset = torch.utils.data.TensorDataset(all_images, average_predictions)
-        dataloader = torch.utils.data.DataLoader(dataset, batch_size=32, pin_memory=True,
-                                                 shuffle=True, drop_last=True)
-        return dataloader
+        trainsize = int(len(dataset) * 0.8)
+        valsize = len(dataset) - trainsize
+        trainset, valset = torch.utils.data.random_split(dataset, [trainsize, valsize])
+
+        trainloader = torch.utils.data.DataLoader(trainset, batch_size=64, pin_memory=True,
+                                                  shuffle=True, drop_last=True, num_workers=4)
+        valloader = torch.utils.data.DataLoader(valset, batch_size=128, pin_memory=True,
+                                                shuffle=False, drop_last=True, num_workers=4)
+        return trainloader, valloader
 
     @aggregate_fit_wrapper
     def aggregate_fit(self, server_round: int, results, failures):
@@ -176,8 +181,8 @@ class FedDF(FedProx):
 
         # perform KD
         updated_models_list = []
-        teacher_dataloader = self._init_dataloader(teacher_models, teacher_capacities) \
-            if self.kd_epochs > 0 else None
+        teacher_dataloader, teacher_valloader = self._init_dataloader(teacher_models, teacher_capacities) \
+            if self.kd_epochs > 0 else (None, None)
         del teacher_models  # this way they don't consume any more memory on GPU
         for capacity in self.available_model_capacities:
             print(f"KD model with capacity {capacity}")
@@ -193,7 +198,8 @@ class FedDF(FedProx):
             )
             train_feddf(
                 optimization_config=optimization_config,
-                temperature=self.kd_temperature
+                temperature=self.kd_temperature,
+                valloader=teacher_valloader
             )
             updated_models_list.append(
                 get_parameters(student_model)

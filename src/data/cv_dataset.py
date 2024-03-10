@@ -9,16 +9,9 @@ import torchvision.transforms as T
 
 
 class CustomDataset(Dataset):
-    def __init__(self, images_folder, partition_csv, transforms=None, metadata=None):
+    def __init__(self, images_folder, partition_csv, transforms=None):
         super().__init__()
         self.df = pd.read_csv(partition_csv)
-        if metadata is not None:
-            assert len(metadata) == self.df.shape[0], \
-                f"Not matching shapes: {metadata.shape} {self.df.shape}"
-            assert isinstance(metadata, np.ndarray)
-            self.metadata = metadata
-        else:
-            self.metadata = None
         self.images_folder = images_folder
         self.transforms = transforms
 
@@ -32,10 +25,7 @@ class CustomDataset(Dataset):
         image = Image.open(f"{self.images_folder}/{image_file}")
         if self.transforms:
             image = self.transforms(image)
-        if self.metadata is None:
-            return image, target
-        mtd = torch.from_numpy(self.metadata[idx])
-        return image, target, mtd
+        return image, target
 
 
 class UnlabeledDataset(Dataset):

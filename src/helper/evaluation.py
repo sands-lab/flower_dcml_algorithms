@@ -10,7 +10,12 @@ class WandbEvaluation:
         super().__init__()
         self.epoch = 0
         self.start_time = time.time()
+        self.strategy = None
+        self.accuracy_list = []
         self.log_data = wandb.log if log_to_wandb else lambda *args: None
+
+    def set_strategy(self, strategy):
+        self.strategy = strategy
 
     def _init_dict(self, dataset_size, client_idx, type_, fit_aggregation):
         return {
@@ -47,7 +52,15 @@ class WandbEvaluation:
         for k, v in metric_values.items():
             global_log_dict[k] = np.average(v, weights=dataset_sizes).item()
         self.log_data(global_log_dict)
-        return {"accuracy": np.average(metric_values["accuracy"], weights=dataset_sizes).item()}
+        acc = np.average(metric_values["accuracy"], weights=dataset_sizes).item()
+        self.accuracy_list.append(acc)
+        print(acc)
+        if len(self.accuracy_list) > 5 and max(self.accuracy_list[:-4]) > max(self.accuracy_list[-4:]):
+            t = "=" * 20
+            print(f"\n{t}{t}ALGORITHM CONVERGED: {self.accuracy_list[-10:]}\n{t}{t}\n\n")
+            self.strategy.set_converged()
+
+        return {"accuracy": acc}
 
     def eval_aggregation_fn(self, metrics):
         return self._evaluate(metrics, False)

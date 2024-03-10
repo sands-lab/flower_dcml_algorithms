@@ -120,16 +120,16 @@ class LeNet5(nn.Module):
         super().__init__()
         self.model = nn.Sequential(
             nn.Conv2d(3, 6, kernel_size=5, stride=1),
-            nn.Tanh(),
+            nn.ReLU(),
             nn.AvgPool2d(2, 2),
             nn.Conv2d(6, 16, kernel_size=5, stride=1),
-            nn.Tanh(),
+            nn.ReLU(),
             nn.AvgPool2d(2, 2),
             nn.Conv2d(16, 120, kernel_size=5, stride=1),
-            nn.Tanh(),
+            nn.ReLU(),
             nn.Flatten(),
             nn.Linear(120, 100),
-            nn.Tanh(),
+            nn.ReLU(),
             nn.Linear(100, n_classes)
         )
 

@@ -3,8 +3,7 @@ from dataclasses import dataclass, field
 import torch
 
 
-def init_optimizer(model, optimizer_name, lr, weight_decay):
-    parameters = model.parameters()
+def init_optimizer(parameters, optimizer_name, lr, weight_decay):
 
     if optimizer_name == "adam":
         optimizer = torch.optim.Adam(parameters, lr=lr, weight_decay=weight_decay)
@@ -33,4 +32,9 @@ class OptimizationConfig:
         self.model = self.model.to(self.device)
         if self.optimizer_name not in {"sgd", "adam"}:
             raise ValueError("Optimizer should be either `sgd` or `adam`")
-        self.optimizer = init_optimizer(self.model, self.optimizer_name, self.lr, self.weight_decay)
+        self.optimizer = init_optimizer(
+            self.model.parameters(),
+            self.optimizer_name,
+            self.lr,
+            self.weight_decay
+        )

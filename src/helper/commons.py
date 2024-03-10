@@ -94,3 +94,11 @@ def np_softmax(matrix: np.ndarray, axis: int):
 
 def get_numpy(tensor: torch.Tensor):
     return tensor.detach().cpu().numpy()
+
+
+def read_json(file, key_list):
+    with open(file, "r") as fp:
+        value = json.load(fp)
+    for key in key_list:
+        value = value[key]
+    return value

@@ -1,0 +1,22 @@
+{
+    "cifar10": {
+        "0": "src.models.fully_conv_net.LargeAllConvNet",
+        "1": "src.models.fully_conv_net.MediumAllConvNet",
+        "2": "src.models.fully_conv_net.SmallAllConvNet"
+    },
+    "cifar100": {
+        "0": "src.models.fully_conv_net.LargeAllConvNet",
+        "1": "src.models.fully_conv_net.MediumAllConvNet",
+        "2": "src.models.fully_conv_net.SmallAllConvNet"
+    },
+    "cinic": {
+        "0": "src.models.fully_conv_net.LargeAllConvNet",
+        "1": "src.models.fully_conv_net.MediumAllConvNet",
+        "2": "src.models.fully_conv_net.SmallAllConvNet"
+    },
+    "mnist": {
+        "0": "src.models.mnist_convnet.LargeMnistConvNet",
+        "1": "src.models.mnist_convnet.MediumMnistConvNet",
+        "2": "src.models.mnist_convnet.SmallMnistConvNet"
+    }
+}

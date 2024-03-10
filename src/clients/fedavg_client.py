@@ -3,6 +3,7 @@ import numpy as np
 from src.models.training_procedures import train
 from src.clients.base_client import BaseClient
 from src.helper.commons import sync_rng_state
+from src.data.dataset_partition import DatasetPartition
 
 
 class FedAvgClient(BaseClient):
@@ -14,7 +15,10 @@ class FedAvgClient(BaseClient):
     def fit(self, parameters, config):
         assert all(np.isfinite(param).all() for param in parameters)
 
-        trainloader = self._init_dataloader(train=True, batch_size=config["batch_size"])
+        trainloader = self._init_dataloader(
+            dataset_partition=DatasetPartition.TRAIN,
+            batch_size=config["batch_size"]
+        )
         self.set_parameters(self.model, parameters)
         train(
             self.get_optimization_config(trainloader, config)

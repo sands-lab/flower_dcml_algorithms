@@ -6,19 +6,17 @@ from functools import partial
 import torch
 import flwr as fl
 import hydra
-from hydra.core.config_store import ConfigStore, OmegaConf
+from hydra.core.config_store import OmegaConf
 from hydra.utils import instantiate
 import wandb
 from dotenv import load_dotenv
 
-from conf.config_schema import ParamConfig
 from src.helper.evaluation import WandbEvaluation
 from src.helper.fl_helper import construct_config_fn
 from src.helper.model_heterogeneity import inject_model_capacity, init_client_id_to_capacity_mapping
 from src.helper.commons import set_seed, load_data_config, generate_wandb_config
+from src.helper.commons import read_json
 
-cs = ConfigStore.instance()
-cs.store(name="config", node=ParamConfig)
 
 
 def access_config(config, key_string):
@@ -29,8 +27,8 @@ def access_config(config, key_string):
     return value
 
 
-@hydra.main(version_base=None, config_path="conf", config_name="base_config")
-def run(cfg: ParamConfig):
+@hydra.main(version_base=None, config_path="config/hydra", config_name="base_config")
+def run(cfg):
     print(cfg)
 
     data_home_folder = os.environ.get("FLTB_DATA_HOME_FOLDER")
@@ -39,11 +37,7 @@ def run(cfg: ParamConfig):
         f"{partitions_home_folder}/{cfg.data.dataset}/{cfg.data.partitioning_configuration}"
 
     data_config = load_data_config(partition_folder)
-    n_classes = {
-        "cifar10": 10,
-        "mnist": 10,
-        "cinic": 10
-    }[data_config["dataset_name"]]
+    n_classes = read_json("config/data/data_configuration.json", [data_config["dataset_name"], "n_classes"])
 
     print(os.environ.get("LOG_TO_WANDB"))
     log_to_wandb = bool(int(os.environ.get("LOG_TO_WANDB")))
@@ -82,6 +76,7 @@ def run(cfg: ParamConfig):
         fit_metrics_aggregation_fn=evaluator.fit_aggregation_fn,
         on_fit_config_fn=construct_config_fn(OmegaConf.to_container(cfg.local_train), evaluator)
     )
+    evaluator.set_strategy(strategy)
 
     with tempfile.TemporaryDirectory(dir="data/client") as temp_dir:
         print(temp_dir)
@@ -97,7 +92,8 @@ def run(cfg: ParamConfig):
             "images_folder": f"{data_home_folder}/{data_config['dataset_name']}",
             "partition_folder": partition_folder,
             "seed": cfg.general.seed,
-            "experiment_folder": temp_dir
+            "experiment_folder": temp_dir,
+            "separate_val_test_sets": cfg.general.separate_val_test_sets
         }
         random_client_capacities = \
             init_client_id_to_capacity_mapping(

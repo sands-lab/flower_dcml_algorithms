@@ -4,6 +4,7 @@ import torch
 from src.models.training_procedures import train_fd
 from src.clients.base_client import BaseClient
 from src.helper.commons import sync_rng_state
+from src.data.dataset_partition import DatasetPartition
 
 
 class FDClient(BaseClient):
@@ -15,7 +16,10 @@ class FDClient(BaseClient):
 
     @sync_rng_state
     def fit(self, parameters, config):
-        trainloader = self._init_dataloader(train=True, batch_size=config["batch_size"])
+        trainloader = self._init_dataloader(
+            dataset_partition=DatasetPartition.TRAIN,
+            batch_size=config["batch_size"]
+        )
 
         assert len(parameters) == 1 and isinstance(parameters[0], np.ndarray)
         assert parameters[0].shape == (self.n_classes, self.n_classes) or parameters[0].size == 0

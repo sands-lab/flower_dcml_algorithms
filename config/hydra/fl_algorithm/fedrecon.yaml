@@ -1,0 +1,10 @@
+client:
+  _target_: src.clients.fedrecon_client.FedReconClient
+  support_set_perc: 0.1
+  reconstruction_config:
+    lr: 0.05
+    gd_steps: 5
+    optimizer_name: sgd
+    batch_size: 16
+strategy:
+  _target_: src.strategies.fedrecon.FedRecon

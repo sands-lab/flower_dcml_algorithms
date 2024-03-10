@@ -23,7 +23,7 @@ def init_model_from_string(class_string, n_classes, ratio, device):
 
 
 def init_model(client_capacity, n_classes, device, dataset):
-    with open("model_mapping.json", "r") as fp:
+    with open("config/models/model_mapping.json", "r") as fp:
         mapping = json.load(fp)
     class_string = mapping[dataset][str(client_capacity)]
     model = init_model_from_string(class_string, n_classes, 1.0, device)
@@ -31,7 +31,7 @@ def init_model(client_capacity, n_classes, device, dataset):
 
 
 def init_pt_model(client_capacity, n_classes, device, dataset, rate):
-    with open("pt_model_config.json", "r") as fp:
+    with open("config/models/pt_model_config.json", "r") as fp:
         config = json.load(fp)
 
     class_string = config["base_models"][dataset]
@@ -39,4 +39,12 @@ def init_pt_model(client_capacity, n_classes, device, dataset, rate):
         rate = config["capacity_mapping"][str(client_capacity)]
 
     model = init_model_from_string(class_string, n_classes, rate, device)
+    return model
+
+
+def simple_init_model_from_string(class_string):
+    module_name, class_name = class_string.rsplit('.', 1)
+    module = importlib.import_module(module_name)
+    class_ = getattr(module, class_name)
+    model = class_()
     return model

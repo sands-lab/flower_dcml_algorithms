@@ -3,6 +3,7 @@ import copy
 from src.models.training_procedures import train_fpx
 from src.clients.base_client import BaseClient
 from src.helper.commons import sync_rng_state
+from src.data.dataset_partition import DatasetPartition
 
 
 class FedProxClient(BaseClient):
@@ -12,7 +13,10 @@ class FedProxClient(BaseClient):
 
     @sync_rng_state
     def fit(self, parameters, config):
-        trainloader = self._init_dataloader(train=True, batch_size=config["batch_size"])
+        trainloader = self._init_dataloader(
+            dataset_partition=DatasetPartition.TRAIN,
+            batch_size=config["batch_size"]
+        )
         self.set_parameters(self.model, parameters)
         global_model = copy.deepcopy(self.model)
 

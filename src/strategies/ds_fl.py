@@ -72,18 +72,14 @@ class DS_FL(FedAvg):
         assert images.ndim == 4 and images.shape[0] == self.public_dataset_size
         return [images]
 
-    def _aggregate_era(self, client_logits, client_capacities_weights):
-        client_logits = [
-            np_softmax(cl / self.temperature, axis=1) for cl in client_logits  # equations 14 & 15
-        ]
-        return self._aggregate_sa(client_logits, client_capacities_weights)
-
     def _aggregate_sa(self, client_logits, client_capacities_weights):
         return np.average(client_logits, axis=0, weights=client_capacities_weights)
 
     def configure_fit(
         self, server_round: int, parameters: Parameters, client_manager: ClientManager
     ):
+        if self.converged:
+            return []
         config = get_config(self, server_round)
         clients = sample_clients(self, client_manager)
 
@@ -124,10 +120,8 @@ class DS_FL(FedAvg):
         assert all(len(cl) == 1 for cl in client_logits)
         client_logits = [cl[0] for cl in client_logits]
         assert all(cl.shape == (self.public_dataset_size, 10) for cl in client_logits)
-        if self.aggregation_method == "sa":
-            aggregated_logits = self._aggregate_sa(client_logits, client_capacities_weights)
-        elif self.aggregation_method == "era":
-            aggregated_logits = self._aggregate_era(client_logits, client_capacities_weights)
+        aggregated_logits = self._aggregate_sa(client_logits, client_capacities_weights)
+
         aggregated_parameters = ndarrays_to_parameters([aggregated_logits])
 
         # Aggregate custom metrics if aggregation fn was provided

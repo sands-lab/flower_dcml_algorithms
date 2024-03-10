@@ -18,7 +18,7 @@ class Scaler(nn.Module):
 
     def forward(self, inp):
         """Forward of Scalar nn.Module."""
-        output = inp / self.rate
+        output = inp / self.rate if self.train else inp
         return output
 
 
@@ -36,7 +36,7 @@ class AllConvNet(AbstratModel):
         self.conv4 = nn.Conv2d(self.model_config[5], self.model_config[6], 3)
         self.conv5 = nn.Conv2d(self.model_config[6], self.model_config[7], 1)
         self.scaler = Scaler(rate)
-        self.relu = nn.ReLU()
+        self.relu = nn.ReLU(inplace=True)
         self.global_pooling = nn.AvgPool2d(6)
         self.layer_names = self.get_ordered_layer_names()
         self.flatten = nn.Flatten(start_dim=1)
@@ -81,22 +81,30 @@ class AllConvNet(AbstratModel):
         return expanded_config
 
 
+
+class MicroAllConvNet(AllConvNet):
+    def __init__(self, n_classes, rate):
+        model_config = copy.deepcopy(WHOLE_MODEL_CONFIG)[:-1] + [n_classes]
+        model_config = get_reduced_model_config(model_config, 0.1)
+        super().__init__(model_config, rate)
+
+
 class SmallAllConvNet(AllConvNet):
     def __init__(self, n_classes, rate):
-        assert n_classes == 10
-        model_config = get_reduced_model_config(WHOLE_MODEL_CONFIG, 0.2)
+        model_config = copy.deepcopy(WHOLE_MODEL_CONFIG)[:-1] + [n_classes]
+        model_config = get_reduced_model_config(model_config, 0.2)
         super().__init__(model_config, rate)
 
 
 class MediumAllConvNet(AllConvNet):
     def __init__(self, n_classes, rate):
-        assert n_classes == 10
-        model_config = get_reduced_model_config(WHOLE_MODEL_CONFIG, 0.5)
+        model_config = copy.deepcopy(WHOLE_MODEL_CONFIG)[:-1] + [n_classes]
+        model_config = get_reduced_model_config(model_config, 0.5)
         super().__init__(model_config, rate)
 
 
 class LargeAllConvNet(AllConvNet):
     def __init__(self, n_classes, rate):
-        assert n_classes == 10
-        model_config = get_reduced_model_config(WHOLE_MODEL_CONFIG, 1.0)
+        model_config = copy.deepcopy(WHOLE_MODEL_CONFIG)[:-1] + [n_classes]
+        model_config = get_reduced_model_config(model_config, 1.0)
         super().__init__(model_config, rate)

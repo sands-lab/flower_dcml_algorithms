@@ -4,9 +4,6 @@ import numpy as np
 
 from src.clients.fedavg_client import FedAvgClient
 from src.models.helper import init_pt_model
-from src.models.evaluation_procedures import test_accuracy
-from src.helper.optimization_config import OptimizationConfig
-from src.helper.commons import set_seed
 
 
 class PtClient(FedAvgClient):
@@ -44,6 +41,4 @@ class PtClient(FedAvgClient):
 
         if not self.stateful_client:
             self.set_parameters(self.model, parameters)
-        testloader = self._init_dataloader(train=False, batch_size=32)
-        accuracy = test_accuracy(self.model, testloader, self.device)
-        return accuracy, len(testloader.dataset), {"accuracy": accuracy, "client_id": self.cid}
+        return self._evaluate()
