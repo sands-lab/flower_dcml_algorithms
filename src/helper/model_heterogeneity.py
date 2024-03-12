@@ -1,4 +1,8 @@
+import os
+
 import numpy as np
+
+from src.helper.commons import read_json
 
 
 def init_client_id_to_capacity_mapping(n_clients, n_capacities, fixed_capacity=None):
@@ -13,5 +17,12 @@ def init_client_id_to_capacity_mapping(n_clients, n_capacities, fixed_capacity=N
     }
 
 
-def inject_model_capacity(cid, client_fn, client_capacities, **kwargs):
-    return client_fn(client_capacity=client_capacities[cid], cid=int(cid), **kwargs)
+def inject_client_capacity(cid, client_fn, client_capacities=None, **kwargs):
+
+    if client_capacities is not None:
+        capacity = client_capacities[cid]
+    else:
+        device_type = os.getenv("COLEXT_DEVICE_TYPE")
+        capacity = read_json("config", [device_type])
+
+    return client_fn(client_capacity=capacity, cid=int(cid), **kwargs)

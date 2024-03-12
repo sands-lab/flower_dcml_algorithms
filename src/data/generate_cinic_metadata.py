@@ -9,7 +9,7 @@ import pandas as pd
 
 def main():
     load_dotenv()
-    raw_data_folder = os.getenv("FLTB_DATA_HOME_FOLDER")
+    raw_data_folder = os.getenv("COLEXT_DATA_HOME_FOLDER")
     cinic_data_folder = os.path.join(raw_data_folder, "cinic")
 
     # define mapping from name class to index

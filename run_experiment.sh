@@ -49,7 +49,7 @@ sleep 15
 
 for i in $(seq 0 $NUM_CLIENTS);
 do
-    export FLTB_CLIENT_ID=$i
+    export COLEXT_CLIENT_ID=$i
     echo "Client ::: Starting client ${i}..."
     python run_client.py "$@" &
     pids[$i]=$!

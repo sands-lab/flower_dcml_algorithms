@@ -18,6 +18,7 @@ from src.strategies.commons import (
     aggregate_fit_wrapper
 )
 from src.helper.parameters import set_parameters, get_parameters
+from src.fl.client_manager import HeterogeneousClientManager
 
 
 class PT(FedAvg):
@@ -26,9 +27,9 @@ class PT(FedAvg):
         self.model = None
         self.dataset_name = None
         self.round_submodel_configs = None
-        self.client_to_capacity_mapping = None
         self.evaluate_on_whole_model = evaluate_on_whole_model
         self.constant_rate = constant_rate
+        self.round_client_to_capacity_mapping = None
         self.set_capacity_to_rate_mapping()
 
     def initialize_parameters(self, client_manager):
@@ -52,19 +53,19 @@ class PT(FedAvg):
             config = json.load(fp)
         self.capacity_to_rate_mapping = config["capacity_mapping"]
 
-    def _get_client_rate(self, cid):
+    def _get_client_rate(self, cid, client_to_capacity_mapping):
         if self.constant_rate is not None:
             return self.constant_rate
-        client_capacity = self.client_to_capacity_mapping[cid]
+        client_capacity = client_to_capacity_mapping[cid]
         client_rate = self.capacity_to_rate_mapping[str(client_capacity)]
         return client_rate
 
-    def _extract_submodel_params(self, clients):
+    def _extract_submodel_params(self, clients, client_to_capacity_mapping):
         client_submodels = []
         round_submodel_configs = {}
         for idx, client in enumerate(clients):
             cid = client.cid
-            client_rate = self._get_client_rate(cid)
+            client_rate = self._get_client_rate(cid, client_to_capacity_mapping)
             capacity_config = self.model.get_reduced_model_config(client_rate)
             client_submodel_config_idx = self.configure_client_submodel(
                 idx,
@@ -81,7 +82,7 @@ class PT(FedAvg):
         return client_submodels, round_submodel_configs
 
     def configure_fit(
-            self, server_round: int, parameters, client_manager
+            self, server_round: int, parameters, client_manager: HeterogeneousClientManager
     ):
         if self.converged:
             return []
@@ -92,11 +93,13 @@ class PT(FedAvg):
         clients = sample_clients(self, client_manager)
         self.setup_round(server_round, len(clients))
 
-        client_submodels, self.round_submodel_configs = self._extract_submodel_params(clients)
+        client_submodels, self.round_submodel_configs = \
+            self._extract_submodel_params(clients, client_manager.client_to_capacity_mapping)
 
         client_fit_ins = [
             FitIns(ndarrays_to_parameters(model), config) for model in client_submodels
         ]
+        self.round_client_to_capacity_mapping = client_manager.client_to_capacity_mapping
         return list(zip(clients, client_fit_ins))
 
     @aggregate_fit_wrapper
@@ -106,7 +109,7 @@ class PT(FedAvg):
         for client, client_res in results:
             submodel_params = parameters_to_ndarrays(client_res.parameters)
             submodel = init_pt_model(
-                client_capacity=self.client_to_capacity_mapping[client.cid],
+                client_capacity=self.round_client_to_capacity_mapping[client.cid],
                 n_classes=self.n_classes,
                 device=torch.device("cpu"),
                 dataset=self.dataset_name,
@@ -119,10 +122,11 @@ class PT(FedAvg):
         updated_model_params = aggregate_submodels(self.model, submodels_list, submodel_configs)
         set_parameters(self.model, updated_model_params)
 
+        self.round_client_to_capacity_mapping = None
         return ndarrays_to_parameters(updated_model_params)
 
     def configure_evaluate(
-        self, server_round: int, parameters, client_manager
+        self, server_round: int, parameters, client_manager: HeterogeneousClientManager
     ):
         if not self.evaluate_round(server_round):
             return []
@@ -132,7 +136,8 @@ class PT(FedAvg):
         clients = sample_clients(self, client_manager)
         config = get_config(self, server_round)
 
-        client_submodels, _ = self._extract_submodel_params(clients)
+        client_submodels, _ = \
+            self._extract_submodel_params(clients, client_manager.client_to_capacity_mapping)
 
         client_eval_ins = [EvaluateIns(ndarrays_to_parameters(params), config)
                            for params in client_submodels]

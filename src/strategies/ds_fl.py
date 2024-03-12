@@ -15,22 +15,20 @@ from src.strategies.commons import (
     sample_clients,
     get_config
 )
-from src.helper.commons import np_softmax
 from src.strategies.fedavg import FedAvg
-from src.models.helper import init_model
+from src.helper.commons import read_json
 
 
 # pylint: disable=C0103
 class DS_FL(FedAvg):
 
     def __init__(self, temperature, aggregation_method, public_dataset_name,
-                 public_dataset_size, public_dataset_csv, train_server_model, *args, **kwargs):
+                 public_dataset_size, public_dataset_csv, *args, **kwargs):
         super().__init__(*args, **kwargs)
         assert aggregation_method in {"era", "sa"}
         assert (temperature == -1) == (aggregation_method == "sa")
         self.aggregation_method = aggregation_method
         self.temperature = temperature
-        self.train_server_model = train_server_model
         self.public_dataset_name = public_dataset_name
         self.public_dataset_size = public_dataset_size
         self.public_dataset_params = ndarrays_to_parameters(
@@ -40,14 +38,11 @@ class DS_FL(FedAvg):
         self.initialized_clients = set()  # track which clients have received public dataset
 
     def initialize_parameters(self, client_manager: ClientManager):
-        if self.train_server_model:
-            # train on the server using (11) a model with maximum capacity
-            self.model = init_model("0", 10, self.device, self.dataset_name)
         return ndarrays_to_parameters([np.empty((0,))])
 
     def _load_public_dataset(self, dataset_name, dataset_size, public_dataset_csv):
         public_dataset_home_folder = \
-            os.path.join(os.environ.get("FLTB_DATA_HOME_FOLDER"), dataset_name)
+            os.path.join(os.environ.get("COLEXT_DATA_HOME_FOLDER"), dataset_name)
         if public_dataset_csv is None:
             sampled_data = pd.read_csv(f"{public_dataset_home_folder}/metadata.csv")\
                 .sample(n=dataset_size, replace=False, random_state=10, axis=0)
@@ -55,13 +50,14 @@ class DS_FL(FedAvg):
             sampled_data = pd.read_csv(public_dataset_csv)
 
         images = []
-        if self.public_dataset_name == "cifar100":
-            norm = T.Normalize(mean=(0.4914, 0.4822, 0.4465), std=(0.247, 0.243, 0.261))
-        else:
-            raise Exception()  # TODO - handle other datasets
+        norm_params = read_json(
+            "config/data/data_configuration.json",
+            [self.public_dataset_name, "normalization_parameters"]
+        )
+
         image_transforms = T.Compose([
             T.ToTensor(),
-            norm
+            T.Normalize(mean=norm_params["mean"], std=norm_params["std"])
         ])
         for _, row in sampled_data.iterrows():
             image = Image.open(os.path.join(public_dataset_home_folder, row["filename"]))
@@ -72,8 +68,8 @@ class DS_FL(FedAvg):
         assert images.ndim == 4 and images.shape[0] == self.public_dataset_size
         return [images]
 
-    def _aggregate_sa(self, client_logits, client_capacities_weights):
-        return np.average(client_logits, axis=0, weights=client_capacities_weights)
+    def _aggregate_sa(self, client_logits):
+        return np.mean(client_logits, axis=0)
 
     def configure_fit(
         self, server_round: int, parameters: Parameters, client_manager: ClientManager
@@ -87,7 +83,6 @@ class DS_FL(FedAvg):
         for client in clients:
             if client.cid in self.initialized_clients:
                 # send the current parameters
-                assert parameters_to_ndarrays(parameters)[0].shape == (self.public_dataset_size, 10)
                 fit_in = FitIns(parameters, config)
             else:
                 # send the global dataset
@@ -106,21 +101,9 @@ class DS_FL(FedAvg):
             parameters_to_ndarrays(fit_res.parameters)
             for _, fit_res in results
         ]
-        client_capacities = [
-            self.client_to_capacity_mapping[client.cid] for client, _ in results
-        ]
 
-        client_capacities_weights = [
-            {
-                0: 0.5,
-                1: 0.35,
-                2: 0.15
-            }[capacity] for capacity in client_capacities
-        ]
-        assert all(len(cl) == 1 for cl in client_logits)
         client_logits = [cl[0] for cl in client_logits]
-        assert all(cl.shape == (self.public_dataset_size, 10) for cl in client_logits)
-        aggregated_logits = self._aggregate_sa(client_logits, client_capacities_weights)
+        aggregated_logits = self._aggregate_sa(client_logits)
 
         aggregated_parameters = ndarrays_to_parameters([aggregated_logits])
 

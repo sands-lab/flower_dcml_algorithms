@@ -1,6 +1,7 @@
 {
     "base_models": {
         "cifar10": "src.models.fully_conv_net.LargeAllConvNet",
+        "cifar100": "src.models.fully_conv_net.LargeAllConvNet",
         "cinic": "src.models.fully_conv_net.LargeAllConvNet",
         "mnist": "src.models.convnet.FedAvgMnistNet"
     },

@@ -7,7 +7,6 @@ from flwr.common import (
     parameters_to_ndarrays,
     ndarrays_to_parameters
 )
-from flwr.server.client_manager import ClientManager
 from flwr.server.strategy.aggregate import aggregate
 
 from src.helper.parameters import get_parameters, set_parameters
@@ -21,17 +20,16 @@ from src.strategies.commons import (
 )
 from src.data.cv_dataset import UnlabeledDataset
 from src.strategies.fedprox import FedProx
+from src.fl.client_manager import HeterogeneousClientManager
 
 
 class FedDF(FedProx):
 
     def __init__(self, public_dataset_name, kd_temperature, kd_optimizer,
-                 kd_lr, kd_epochs, public_dataset_size, weight_predictions, *args,
-                 client_to_capacity_mapping_file=None, **kwargs):
+                 kd_lr, kd_epochs, public_dataset_size, weight_predictions, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.available_model_capacities = None
         self.model_lens = None
-        self.set_client_capacity_mapping(client_to_capacity_mapping_file)
         self.public_dataset_name = public_dataset_name
         self.public_dataset_size = public_dataset_size
         self.kd_temperature = kd_temperature
@@ -40,6 +38,7 @@ class FedDF(FedProx):
         self.kd_epochs = kd_epochs
         self.weight_predictions = weight_predictions
         self.device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+        self.round_capacity_mapping = None
         assert torch.cuda.is_available()
         self.dataset_name = None
         # in a given epoch, a given model capacity might not be represented.
@@ -48,13 +47,15 @@ class FedDF(FedProx):
         # its value will be set in self.initialize_parameters(...)
         self.model_arrays = None
 
-    def initialize_parameters(self, client_manager: ClientManager) -> Parameters:
+    def initialize_parameters(self, client_manager: HeterogeneousClientManager) -> Parameters:
         noins = GetParametersIns({})
         clients = client_manager.all()
         model_arrays = []
+        self.available_model_capacities = sorted(list(set(client_manager.client_to_capacity_mapping.values())))
+        print(f"Available model capacities: {self.available_model_capacities}")
         for capacity in self.available_model_capacities:
             for _, client in clients.items():
-                if self.client_to_capacity_mapping[client.cid] == capacity:
+                if client_manager.client_to_capacity_mapping[client.cid] == capacity:
                     model_arrays.append(
                         parameters_to_ndarrays(client.get_parameters(noins, None).parameters)
                     )
@@ -81,31 +82,34 @@ class FedDF(FedProx):
             idx += ln
         return models
 
-    def _map_client_to_capacities(self, clients):
+    def _map_client_to_capacities(self, clients, client_to_capacity_mapping):
         return [
-            self.client_to_capacity_mapping[client.cid] for client in clients
+            client_to_capacity_mapping[client.cid] for client in clients
         ]
 
-    def _get_client_models_parameters(self, clients, parameters):
-        models = {k: model for k, model in zip(self.available_model_capacities, self.model_arrays)}
+    def _get_client_models_parameters(self, clients, client_to_capacity_mapping):
+        models = dict(zip(self.available_model_capacities, self.model_arrays))
+        mapping_list = self._map_client_to_capacities(clients, client_to_capacity_mapping)
         client_models = [
-            models[client_capacity] for client_capacity in self._map_client_to_capacities(clients)
+            models[client_capacity] for client_capacity in mapping_list
         ]
         return [ndarrays_to_parameters(cm) for cm in client_models]
 
     def configure_fit(
-            self, server_round: int, parameters: Parameters, client_manager: ClientManager
+        self, server_round: int, parameters: Parameters, client_manager: HeterogeneousClientManager
     ):
         if self.converged:
             return []
         config = get_config(self, server_round)
         config["proximal_mu"] = self.proximal_mu
         clients = sample_clients(self, client_manager)
-        client_model_parameters = self._get_client_models_parameters(clients, parameters)
+        client_model_parameters = \
+            self._get_client_models_parameters(clients, client_manager.client_to_capacity_mapping)
 
         client_fit_ins = [
             FitIns(model, config) for model in client_model_parameters
         ]
+        self.round_capacity_mapping = client_manager.client_to_capacity_mapping
         return list(zip(clients, client_fit_ins))
 
     def _init_dataloader(self, teacher_models, teacher_capacities):
@@ -128,7 +132,7 @@ class FedDF(FedProx):
         device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         weights = weights.reshape(-1, 1, 1).to(device).float()
         weights_sum = weights.sum().to(device)
-        for idx in range(len(teacher_models)):
+        for idx, _ in enumerate(teacher_models):
             teacher_models[idx] = teacher_models[idx].eval().to(device)
 
         average_predictions, all_images = [], []
@@ -158,7 +162,10 @@ class FedDF(FedProx):
 
     @aggregate_fit_wrapper
     def aggregate_fit(self, server_round: int, results, failures):
-        client_capacities = self._map_client_to_capacities([client for client, _ in results])
+        _ = (server_round, failures)
+        clients = [client for client, _ in results]
+        client_capacities = self._map_client_to_capacities(clients, self.round_capacity_mapping)
+
         grouped_updated_models = {k: [] for k in self.available_model_capacities}
         teacher_models, teacher_capacities = [], []
         for capacity, (_, fit_res) in zip(client_capacities, results):
@@ -181,8 +188,10 @@ class FedDF(FedProx):
 
         # perform KD
         updated_models_list = []
-        teacher_dataloader, teacher_valloader = self._init_dataloader(teacher_models, teacher_capacities) \
+        tmp = self._init_dataloader(teacher_models, teacher_capacities) \
             if self.kd_epochs > 0 else (None, None)
+        teacher_dataloader, teacher_valloader = tmp
+
         del teacher_models  # this way they don't consume any more memory on GPU
         for capacity in self.available_model_capacities:
             print(f"KD model with capacity {capacity}")
@@ -212,7 +221,7 @@ class FedDF(FedProx):
 
 
     def configure_evaluate(
-        self, server_round: int, parameters: Parameters, client_manager: ClientManager
+        self, server_round: int, parameters: Parameters, client_manager: HeterogeneousClientManager
     ):
         if not self.evaluate_round(server_round):
             return []
@@ -220,6 +229,8 @@ class FedDF(FedProx):
         clients = sample_clients(self, client_manager)
         config = get_config(self, server_round)
 
-        client_model_parameters = self._get_client_models_parameters(clients, parameters)
+        client_model_parameters = \
+            self._get_client_models_parameters(clients, client_manager.client_to_capacity_mapping)
+
         client_eval_ins = [EvaluateIns(params, config) for params in client_model_parameters]
         return list(zip(clients, client_eval_ins))

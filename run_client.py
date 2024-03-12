@@ -3,24 +3,19 @@ import tempfile
 
 import flwr as fl
 import hydra
-from conf.config_schema import ParamConfig
-from hydra.core.config_store import ConfigStore
 from hydra.utils import instantiate
 from dotenv import load_dotenv
 
 
-cs = ConfigStore.instance()
-cs.store(name="config", node=ParamConfig)
-
 
 @hydra.main(version_base=None, config_path="conf", config_name="base_config")
-def main(cfg: ParamConfig):
+def main(cfg):
 
     #read the environment variables
-    data_home_folder = os.environ.get("FLTB_DATA_HOME_FOLDER")
+    data_home_folder = os.environ.get("COLEXT_DATA_HOME_FOLDER")
     partitions_home_folder = "./data/partitions"
-    client_idx = os.environ.get("FLTB_CLIENT_ID")
-    server_ip = os.environ.get("FLTB_SERVER_ADDRESS")
+    client_idx = os.environ.get("COLEXT_CLIENT_ID")
+    server_ip = os.environ.get("COLEXT_SERVER_ADDRESS")
 
     partitions_exp_folder = f"{partitions_home_folder}/{cfg.data.dataset}/{cfg.data.partitioning_configuration}"
 

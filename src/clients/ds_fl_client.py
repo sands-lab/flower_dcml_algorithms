@@ -31,7 +31,6 @@ class DS_FLClient(BaseClient):
             # l = torch.nn.functional.softmax(preds, dim=1).clone().cpu().numpy()
             logits.append(preds.clone().cpu().numpy())
         logits = np.vstack(logits)
-        assert logits.shape == (len(dataset), 10)
         return logits
 
     def _get_kd_trainloader(self, public_logits, batch_size):

@@ -8,4 +8,3 @@ strategy:
   public_dataset_name: cifar100
   public_dataset_size: 1000
   public_dataset_csv: null #data/partitions/mnist/shard_100clients_19seed_0.2test_5000holdoutsize/public_dataset.csv
-  train_server_model: false

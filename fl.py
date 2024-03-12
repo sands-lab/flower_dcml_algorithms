@@ -13,9 +13,10 @@ from dotenv import load_dotenv
 
 from src.helper.evaluation import WandbEvaluation
 from src.helper.fl_helper import construct_config_fn
-from src.helper.model_heterogeneity import inject_model_capacity, init_client_id_to_capacity_mapping
+from src.helper.model_heterogeneity import inject_client_capacity, init_client_id_to_capacity_mapping
 from src.helper.commons import set_seed, load_data_config, generate_wandb_config
 from src.helper.commons import read_json
+from src.fl.client_manager import HeterogeneousClientManager
 
 
 
@@ -31,7 +32,7 @@ def access_config(config, key_string):
 def run(cfg):
     print(cfg)
 
-    data_home_folder = os.environ.get("FLTB_DATA_HOME_FOLDER")
+    data_home_folder = os.environ.get("COLEXT_DATA_HOME_FOLDER")
     partitions_home_folder = "./data/partitions"
     partition_folder = \
         f"{partitions_home_folder}/{cfg.data.dataset}/{cfg.data.partitioning_configuration}"
@@ -105,20 +106,20 @@ def run(cfg):
         client_id_to_capacity_mapping_file = f"{temp_dir}/model_capacities.json"
         with open(client_id_to_capacity_mapping_file, "w") as fp:
             json.dump(random_client_capacities, fp)
-        strategy.set_client_capacity_mapping(client_id_to_capacity_mapping_file)
         strategy.set_dataset_name(data_config["dataset_name"])
 
-        client_fn_ = partial(inject_model_capacity,
+        client_fn_ = partial(inject_client_capacity,
                              client_fn=client_fn,
                              client_capacities=random_client_capacities,
                              **common_kwargs)
 
         fl.simulation.start_simulation(
-            client_fn=client_fn_,
+            client_fn=lambda cid: client_fn_(cid).to_client(),
             num_clients=data_config["n_clients"],
             config=fl.server.ServerConfig(num_rounds=cfg.global_train.epochs),
             strategy=strategy,
             client_resources=client_resources,
+            client_manager=HeterogeneousClientManager()
         )
 
     if log_to_wandb:

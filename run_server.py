@@ -24,7 +24,7 @@ cs.store(name="config", node=ParamConfig)
 def main(cfg: ParamConfig):
 
     partitions_home_folder = "./data/partitions"
-    server_ip = os.environ.get("FLTB_SERVER_ADDRESS")
+    server_ip = os.environ.get("COLEXT_SERVER_ADDRESS")
     log_to_wandb = int(os.environ.get("LOG_TO_WANDB", "0"))
     assert log_to_wandb in {0, 1}, "Logging to wandb should be set to either 0 or 1"
     log_to_wandb = bool(log_to_wandb)

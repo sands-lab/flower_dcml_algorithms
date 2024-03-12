@@ -1,7 +1,9 @@
 import os
 from logging import INFO
+from typing import Dict
 
 import flwr as fl
+from flwr.common import Config
 from flwr.common.logger import log
 import torch
 from torch.utils.data import DataLoader
@@ -50,8 +52,11 @@ class BaseClient(fl.client.NumPyClient):
         self.separate_val_test_sets = separate_val_test_sets
         self.measure_accuracy_on_public_dataset = False  # only for reproducibility purposes
         save_rng_state_if_not_exists(self.client_working_folder)
-        log(INFO, "Initialed client %s [model %s] on %s...", cid,
-            self.model.__class__.__name__, self.device)
+        log(INFO, "Initialed client %s [model %s %d] on %s...", cid,
+            self.model.__class__.__name__, self.get_model_size(), self.device)
+
+    def get_model_size(self):
+        return sum(p.numel() for p in self.model.parameters())
 
     def get_parameters(self, config):
         assert not self.stateful_client, "Should not call get_parameters on stateful clients!!"
@@ -139,3 +144,8 @@ class BaseClient(fl.client.NumPyClient):
             device=self.device,
             **kwargs
         )
+
+    def get_properties(self, config):
+        return {
+            "client_capacity": self.client_capacity
+        }
