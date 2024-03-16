@@ -1,9 +1,8 @@
-import json
-
 import numpy as np
 
 from src.helper.parameters import get_parameters, set_parameters
-from src.helper.commons import sync_rng_state, set_seed
+from src.helper.commons import sync_rng_state, set_seed, read_json
+from src.helper.filepaths import FilePaths as FP
 from src.models.training_procedures import train_fedkd
 from src.models.helper import init_model_from_string
 from src.clients.base_client import BaseClient
@@ -14,8 +13,7 @@ class FedKDClient(BaseClient):
 
     def __init__(self, temperature, **kwargs):
         super().__init__(**kwargs, stateful_client=True)
-        with open("config/models/fedkd_model_config.json", "r") as fp:
-            model_string = json.load(fp)[self.dataset_name]
+        model_string = read_json(FP.FEDKD_MODEL_CONFIG, [self.dataset_name])
         set_seed(self.seed)
         # init the shared model on the CPU because if we are going to call the evaluate method
         # we don't actually need the model, so we can delete it. by initializing it on the cpu,

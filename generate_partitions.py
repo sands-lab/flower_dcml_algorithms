@@ -11,6 +11,7 @@ from src.helper.data_partitioning_configuration import (
     FDPartitioning,
     IIDPartitioning
 )
+from src.helper.environment_variables import EnvironmentVariables as EV
 
 
 def main():
@@ -41,7 +42,7 @@ def main():
     args = parser.parse_args()
     args = {k: v for k, v in vars(args).items() if v is not None}
 
-    data_home_folder = os.environ.get("COLEXT_DATA_HOME_FOLDER")
+    data_home_folder = os.environ.get(EV.DATA_HOME_FOLDER)
     partitions_home_folder = "./data/partitions"
     assert os.path.isdir(data_home_folder), f"Folder {data_home_folder} does not exist"
     download_data(data_home_folder, args["dataset_name"])

@@ -9,17 +9,29 @@ class HeterogeneousClientManager(SimpleClientManager):
         super().__init__()
         self.client_to_capacity_mapping = {}
 
-    def register(self, client: ClientProxy) -> bool:
-        success = super().register(client)
-        if success:
-            ins = GetPropertiesIns({})
-            props = client.get_properties(ins, None)
-            client_capacity = props.properties["client_capacity"]
-            self.client_to_capacity_mapping[client.cid] = client_capacity
-            print(f"Registered client {client.cid} with capacity {client_capacity}")
-
-        return success
-
     def unregister(self, client: ClientProxy) -> None:
         super().unregister(client)
-        del self.client_to_capacity_mapping[client.cid]
+        print(f"Unregistering client {client.cid}")
+        if client.cid in self.client_to_capacity_mapping:
+            # this happens when unregistering a client for which we did not yet call get_props
+            del self.client_to_capacity_mapping[client.cid]
+
+    def sync_client_to_capacity(self, clients):
+        # cannot use this in .register because the servicer did not start to listen to client
+        # requests yet...
+        for client_proxy in clients:
+            cid = client_proxy.cid
+            noins = GetPropertiesIns({})
+            if cid not in self.client_to_capacity_mapping:
+                res = client_proxy.get_properties(noins, None)
+                capacity = res.properties["client_capacity"]
+                self.client_to_capacity_mapping[cid] = capacity
+
+    def sample(self, *args, **kwargs):
+        clients = super().sample(*args, **kwargs)
+        self.sync_client_to_capacity(clients)
+        return clients
+
+    def all(self):
+        self.sync_client_to_capacity(self.clients.values())
+        return self.clients

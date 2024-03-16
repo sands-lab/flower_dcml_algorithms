@@ -9,7 +9,7 @@ from src.data.dataset_partition import DatasetPartition
 
 
 def handle_early_stopping(accuracy, file):
-    train = True
+    is_train = True
     if accuracy is not None:
         with open(file, "rb") as fp:
             accuracies = pickle.load(fp)
@@ -18,12 +18,12 @@ def handle_early_stopping(accuracy, file):
                 len(accuracies) > 10 and
                 np.mean(accuracies[-10:-5]) * 0.9 > np.mean(accuracies[-5:])
             ):
-                train = False
+                is_train = False
     else:
         accuracies = []
     with open(file, "wb") as fp:
         pickle.dump(accuracies, fp)
-    return train
+    return is_train
 
 
 class PrivateTrainingClient(BaseClient):

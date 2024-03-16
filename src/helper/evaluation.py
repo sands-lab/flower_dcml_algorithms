@@ -6,12 +6,13 @@ import wandb
 
 
 class WandbEvaluation:
-    def __init__(self, log_to_wandb) -> None:
+    def __init__(self, log_to_wandb, patience) -> None:
         super().__init__()
         self.epoch = 0
         self.start_time = time.time()
         self.strategy = None
         self.accuracy_list = []
+        self.patience = patience
         self.log_data = wandb.log if log_to_wandb else lambda *args: None
 
     def set_strategy(self, strategy):
@@ -31,13 +32,15 @@ class WandbEvaluation:
         dataset_sizes = [n_examples for n_examples, _ in metrics]
         if len(metrics[0][1]) == 0:
             return {}
-        metric_keys = {k for k in metrics[0][1].keys() if k != "client_id"}
+        metric_keys = {k for k in metrics[0][1].keys() if k not in {"client_id", "client_capacity"}}
         client_idxs = [metrics["client_id"] for _, metrics in metrics]
+        client_capacities = [metrics["client_capacity"] for _, metrics in metrics]
         metric_values = {k: [vals[k] for _, vals in metrics] for k in metric_keys}
 
         pd_table = pd.DataFrame({
             "dataset_sizes": dataset_sizes,
             "client_idxs": client_idxs,
+            "client_capacities": client_capacities,
             **metric_values
         })
         wandb_table = wandb.Table(dataframe=pd_table)
@@ -55,7 +58,10 @@ class WandbEvaluation:
         acc = np.average(metric_values["accuracy"], weights=dataset_sizes).item()
         self.accuracy_list.append(acc)
         print(acc)
-        if len(self.accuracy_list) > 5 and max(self.accuracy_list[:-4]) > max(self.accuracy_list[-4:]):
+        if (
+            len(self.accuracy_list) > self.patience and
+            self.accuracy_list[-self.patience-1] > max(self.accuracy_list[-self.patience:])
+        ):
             t = "=" * 20
             print(f"\n{t}{t}ALGORITHM CONVERGED: {self.accuracy_list[-10:]}\n{t}{t}\n\n")
             self.strategy.set_converged()

@@ -8,5 +8,25 @@
                 "2": "src.models.plft_fully_conv_net.SmallEncoder"
             }
         }
+    },
+    "cifar100": {
+        "lg_fedavg": {
+            "common_head": "src.models.plft_fully_conv_net.CommonHead",
+            "encoders": {
+                "0": "src.models.plft_fully_conv_net.LargeEncoder",
+                "1": "src.models.plft_fully_conv_net.MediumEncoder",
+                "2": "src.models.plft_fully_conv_net.SmallEncoder"
+            }
+        }
+    },
+    "cinic": {
+        "lg_fedavg": {
+            "common_head": "src.models.plft_fully_conv_net.CommonHead",
+            "encoders": {
+                "0": "src.models.plft_fully_conv_net.LargeEncoder",
+                "1": "src.models.plft_fully_conv_net.MediumEncoder",
+                "2": "src.models.plft_fully_conv_net.SmallEncoder"
+            }
+        }
     }
 }

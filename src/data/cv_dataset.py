@@ -1,11 +1,11 @@
 import os
 from PIL import Image
 
-import numpy as np
 import pandas as pd
-import torch
 from torch.utils.data import Dataset
 import torchvision.transforms as T
+
+from src.helper.environment_variables import EnvironmentVariables as EV
 
 
 class CustomDataset(Dataset):
@@ -34,7 +34,7 @@ class CustomDataset(Dataset):
 class UnlabeledDataset(Dataset):
     def __init__(self, dataset_name, dataset_size) -> None:
         super().__init__()
-        data_home_folder = os.environ.get("COLEXT_DATA_HOME_FOLDER")
+        data_home_folder = os.environ.get(EV.DATA_HOME_FOLDER)
         dataset_home_folder = f"{data_home_folder}/{dataset_name}"
         self.filepaths = pd.read_csv(f"{dataset_home_folder}/metadata.csv")["filename"]\
             .sample(dataset_size, replace=False).to_list()

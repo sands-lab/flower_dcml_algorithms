@@ -56,10 +56,10 @@ class FedAvg(FlFedAvg):
     def evaluate_round(self, server_round):
         return server_round % self.evaluation_freq == 0 and not self.converged
 
-    def configure_fit(self, *args, **kwargs):
+    def configure_fit(self, server_round, parameters, client_manager):
         if self.converged:
             return []
-        return super().configure_fit(*args, **kwargs)
+        return super().configure_fit(server_round, parameters, client_manager)
 
     def configure_evaluate(
         self, server_round: int, parameters, client_manager

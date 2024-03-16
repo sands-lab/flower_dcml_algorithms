@@ -1,4 +1,3 @@
-import os
 import json
 import tempfile
 from functools import partial
@@ -14,53 +13,21 @@ from dotenv import load_dotenv
 from src.helper.evaluation import WandbEvaluation
 from src.helper.fl_helper import construct_config_fn
 from src.helper.model_heterogeneity import inject_client_capacity, init_client_id_to_capacity_mapping
-from src.helper.commons import set_seed, load_data_config, generate_wandb_config
-from src.helper.commons import read_json
+from src.helper.commons import set_seed, read_env_config
 from src.fl.client_manager import HeterogeneousClientManager
+from src.helper.wandb import init_wandb
 
-
-
-def access_config(config, key_string):
-    keys = key_string.split('.')  # Split the string by delimiter ('.')
-    value = config
-    for key in keys:
-        value = value[key]  # Traverse the nested structure
-    return value
 
 
 @hydra.main(version_base=None, config_path="config/hydra", config_name="base_config")
 def run(cfg):
     print(cfg)
 
-    data_home_folder = os.environ.get("COLEXT_DATA_HOME_FOLDER")
-    partitions_home_folder = "./data/partitions"
-    partition_folder = \
-        f"{partitions_home_folder}/{cfg.data.dataset}/{cfg.data.partitioning_configuration}"
-
-    data_config = load_data_config(partition_folder)
-    n_classes = read_json("config/data/data_configuration.json", [data_config["dataset_name"], "n_classes"])
-
-    print(os.environ.get("LOG_TO_WANDB"))
-    log_to_wandb = bool(int(os.environ.get("LOG_TO_WANDB")))
-    print(log_to_wandb)
-    fl_algorithm_name = cfg.fl_algorithm.strategy._target_.split(".")[-1]
+    data_home_folder, partition_folder, log_to_wandb, data_config, n_classes = read_env_config(cfg)
 
     if log_to_wandb:
-        extract = lambda k: k.split(".")[-1]
-        constants = list(cfg.logging.constants)
-        print(constants)
-        wandb_name = "_".join(
-            [fl_algorithm_name] +
-            (constants if isinstance(constants, list) else [constants]) +
-            [f"{extract(k)}{access_config(cfg, k)}" for k in cfg.logging.name_keys]
-        )
-        print("Logging to wandb...")
-        wandb_config_dict = generate_wandb_config(OmegaConf.to_container(cfg)) | data_config
-        wandb.init(
-            config=wandb_config_dict,
-            name=wandb_name
-        )
-    evaluator = WandbEvaluation(log_to_wandb)
+        init_wandb(cfg, data_config)
+    evaluator = WandbEvaluation(log_to_wandb, patience=cfg.general.patience)
 
     # Create strategy
     set_seed(cfg.general.seed)

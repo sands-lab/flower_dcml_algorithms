@@ -1,5 +1,3 @@
-import json
-
 import torch
 from flwr.common import (
     ndarrays_to_parameters,
@@ -18,6 +16,8 @@ from src.strategies.commons import (
     aggregate_fit_wrapper
 )
 from src.helper.parameters import set_parameters, get_parameters
+from src.helper.filepaths import FilePaths as FP
+from src.helper.commons import read_json
 from src.fl.client_manager import HeterogeneousClientManager
 
 
@@ -25,7 +25,6 @@ class PT(FedAvg):
     def __init__(self, evaluate_on_whole_model, constant_rate, **kwargs):
         super().__init__(**kwargs)
         self.model = None
-        self.dataset_name = None
         self.round_submodel_configs = None
         self.evaluate_on_whole_model = evaluate_on_whole_model
         self.constant_rate = constant_rate
@@ -49,9 +48,7 @@ class PT(FedAvg):
         raise NotImplementedError("This method should be overwritten by the specific algorithm")
 
     def set_capacity_to_rate_mapping(self):
-        with open("config/models/pt_model_config.json", "r") as fp:
-            config = json.load(fp)
-        self.capacity_to_rate_mapping = config["capacity_mapping"]
+        self.capacity_to_rate_mapping = read_json(FP.PT_MODEL_CONFIG, ["capacity_mapping"])
 
     def _get_client_rate(self, cid, client_to_capacity_mapping):
         if self.constant_rate is not None:
@@ -78,7 +75,8 @@ class PT(FedAvg):
             client_submodel_parameters = \
                 self.model.extract_submodel_parameters(expanded_config_idx)
             client_submodels.append(client_submodel_parameters)
-            print("Extracted model for ", cid, ", # parameters: ", sum(p.size for p in client_submodel_parameters))
+            num_params = sum(p.size for p in client_submodel_parameters)
+            print("Extracted model for ", cid, ", # parameters: ", num_params)
         return client_submodels, round_submodel_configs
 
     def configure_fit(

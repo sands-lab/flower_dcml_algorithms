@@ -1,6 +1,5 @@
 import copy
 
-import numpy as np
 import torch
 
 from src.models.helper import construct_matrix
@@ -111,7 +110,6 @@ def train_fd(
         if not empty_logit_matrix:
             # CrossEntropyLoss performs softmax internally, so no need to call the softmax here
             assert not torch.isnan(preds).any()
-            assert not torch.isnan(criterion(preds / temperature, logit_matrix[targets])), f"{preds}, \n\n {logit_matrix[targets]}\n\n\n"
             mask = torch.isin(targets, valid_logits)
             targets_ = targets[mask]
             preds_ = preds[mask,:]
@@ -130,86 +128,6 @@ def train_fd(
     cnts = cnts[cnts > 0].reshape(-1, 1)
     running_sums = (running_sums / cnts).cpu().numpy()
     return [running_sums, client_classes]
-
-
-# pylint: disable=C0103
-def train_fedgkt_client(optimization_config: OptimizationConfig, temperature):
-    model = optimization_config.model
-    optimizer = optimization_config.optimizer
-
-    criterion_ce = torch.nn.CrossEntropyLoss()
-    criterion_kl = KLLoss(temperature)
-
-    # train model
-    for data in _iterate_dataloader(optimization_config):
-        if len(data) == 2:
-            data, targets = data
-            server_logits = None
-        elif len(data) == 3:
-            data, targets, server_logits = data
-
-        preds = model(data)
-        loss = criterion_ce(preds, targets)
-        if server_logits is not None:
-            loss += criterion_kl(preds, server_logits)
-
-        model.zero_grad()
-        loss.backward()
-        optimizer.step()
-
-    # extract features and logits
-    ordered_dataloader = torch.utils.data.DataLoader(optimization_config.dataloader.dataset,
-                                                     shuffle=False, batch_size=32, drop_last=False)
-    H_k, Z_k, Y_k = [], [], []
-    for data in ordered_dataloader:
-        data = [d.to(optimization_config.device) for d in data]
-        if len(data) == 2:
-            data, targets = data
-        else:
-            data, targets, _ = data
-        with torch.no_grad():
-            hk = model.get_embedding(data)
-            zk = model.get_predictions(hk)
-
-        H_k.append(hk.cpu().numpy())
-        Z_k.append(zk.cpu().numpy())
-        Y_k.append(targets.detach().cpu().numpy())
-    H_k = np.vstack(H_k)
-    Z_k = np.vstack(Z_k)
-    Y_k = np.hstack(Y_k)
-    print(H_k.shape)
-    return H_k, Z_k, Y_k
-
-
-def train_fedgkt_server(model, dataloaders, optimizer_name, epochs, lr, device, temperature):
-    model.train()
-    model.to(device)
-    print(f"Server training on {device}")
-    criterion_ce = torch.nn.CrossEntropyLoss()
-    criterion_kl = KLLoss(temperature)
-
-    optimizer = init_optimizer(model, optimizer_name, lr)
-    for i in range(epochs):
-        print(f"Epoch {i}")
-        train_order = np.random.permutation(len(dataloaders))
-        for cid in train_order:
-            print(f"Client {cid}")
-            dataloader = dataloaders[cid]
-
-            for _ in range(epochs):
-                for data in dataloader:
-                    data = [d.to(device) for d in data]
-                    embeddings, logits, targets = data
-
-                    pred_logits = model(embeddings)
-
-                    ce_loss = criterion_ce(pred_logits, targets)
-                    kl_loss = criterion_kl(pred_logits, logits)
-                    loss = ce_loss + kl_loss
-
-                    model.zero_grad()
-                    loss.backward()
-                    optimizer.step()
 
 
 def train_kd_ds_fl(optimization_config: OptimizationConfig, kd_temperature):
@@ -250,7 +168,8 @@ def train_feddf(optimization_config: OptimizationConfig, temperature, valloader)
     for idx, (images, teacher_consensus) in enumerate(_iterate_dataloader(optimization_config)):
         student_predictions = model(images)
 
-        loss = criterion(student_predictions, teacher_consensus)  # in the paper it seems they do the opposite but it is strange...
+        # in the paper it seems they do the opposite but it is strange...
+        loss = criterion(student_predictions, teacher_consensus)
         loss += compute_proximal_term(model, global_model, 0.0001)
         assert torch.isfinite(loss).all()
 
@@ -260,7 +179,8 @@ def train_feddf(optimization_config: OptimizationConfig, temperature, valloader)
         optimizer.step()
 
         if idx % 5 == 0:
-            val_loss = compute_validation_loss_feddf(model, valloader, criterion, optimization_config.device)
+            val_loss = compute_validation_loss_feddf(model, valloader, criterion,
+                                                     optimization_config.device)
             print(f"{idx} {val_loss:.5f}")
             if early_stopper.early_stop(val_loss):
                 print(f"Breaking after {idx} iterations...")
@@ -310,17 +230,17 @@ def train_fedkd(
     criterion_kl = KLLoss(temperature)
 
     for data, targets in _iterate_dataloader(optimization_config):
-        private_predictions = private_model(data)
-        shared_predictions = shared_model(data)
+        private_preds = private_model(data)
+        shared_preds = shared_model(data)
 
         # eq 1 & 2 in the paper
-        private_supervised_loss = criterion_ce(private_predictions, targets)
-        shared_supervised_loss = criterion_ce(shared_predictions, targets)
-        supervised_loss_sum = (private_supervised_loss + shared_supervised_loss).detach()
+        private_supervised_loss = criterion_ce(private_preds, targets)
+        shared_supervised_loss = criterion_ce(shared_preds, targets)
+        sup_loss_sum = (private_supervised_loss + shared_supervised_loss).detach()
 
         # eq 3 & 4
-        private_kl_loss = criterion_kl(private_predictions, shared_predictions.detach())  / supervised_loss_sum.detach()
-        shared_kl_loss = criterion_kl(shared_predictions, private_predictions.detach()) / supervised_loss_sum.detach()
+        private_kl_loss = criterion_kl(private_preds, shared_preds.detach())  / sup_loss_sum
+        shared_kl_loss = criterion_kl(shared_preds, private_preds.detach()) / sup_loss_sum
 
         private_loss = private_kl_loss + private_supervised_loss
         shared_loss = shared_kl_loss + shared_supervised_loss

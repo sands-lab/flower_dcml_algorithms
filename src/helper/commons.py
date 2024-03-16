@@ -6,6 +6,9 @@ import pickle
 import torch
 import numpy as np
 
+from src.helper.filepaths import FilePaths as FP
+from src.helper.environment_variables import EnvironmentVariables as EV
+
 
 def set_seed(seed):
     torch.manual_seed(seed)
@@ -102,3 +105,18 @@ def read_json(file, key_list):
     for key in key_list:
         value = value[key]
     return value
+
+
+def read_env_config(cfg):
+    data_home_folder = os.environ.get(EV.DATA_HOME_FOLDER)
+
+    partitions_home_folder = "./data/partitions"
+    partition_folder = \
+        f"{partitions_home_folder}/{cfg.data.dataset}/{cfg.data.partitioning_configuration}"
+
+    data_config = load_data_config(partition_folder)
+    n_classes = read_json(FP.DATA_CONFIG, [data_config["dataset_name"], "n_classes"])
+
+    log_to_wandb = bool(int(os.environ.get(EV.LOG_TO_WANDB)))
+    print(f"Logging to W&B set to: {log_to_wandb}")
+    return data_home_folder, partition_folder, log_to_wandb, data_config, n_classes

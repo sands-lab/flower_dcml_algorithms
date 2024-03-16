@@ -51,7 +51,8 @@ class FedDF(FedProx):
         noins = GetParametersIns({})
         clients = client_manager.all()
         model_arrays = []
-        self.available_model_capacities = sorted(list(set(client_manager.client_to_capacity_mapping.values())))
+        self.available_model_capacities = \
+            sorted(set(client_manager.client_to_capacity_mapping.values()))
         print(f"Available model capacities: {self.available_model_capacities}")
         for capacity in self.available_model_capacities:
             for _, client in clients.items():

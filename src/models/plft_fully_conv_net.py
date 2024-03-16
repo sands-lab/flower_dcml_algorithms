@@ -12,7 +12,7 @@ class CommonHead(nn.Sequential):
         super().__init__(
             nn.Conv2d(model_config[5], model_config[6], 3),
             nn.ReLU(),
-            nn.Conv2d(model_config[6], model_config[7], 1),
+            nn.Conv2d(model_config[6], n_classes, 1),
             nn.ReLU(),
             nn.AvgPool2d(6),
             nn.Flatten(1)
@@ -41,6 +41,7 @@ class Encoder(nn.Sequential):
 
 class SmallEncoder(Encoder):
     def __init__(self, n_classes, rate):
+        _ = (n_classes, rate)
         super().__init__(0.2)
 
 

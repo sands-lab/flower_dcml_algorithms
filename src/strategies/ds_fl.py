@@ -17,6 +17,7 @@ from src.strategies.commons import (
 )
 from src.strategies.fedavg import FedAvg
 from src.helper.commons import read_json
+from src.helper.environment_variables import EnvironmentVariables as EV
 
 
 # pylint: disable=C0103
@@ -42,7 +43,7 @@ class DS_FL(FedAvg):
 
     def _load_public_dataset(self, dataset_name, dataset_size, public_dataset_csv):
         public_dataset_home_folder = \
-            os.path.join(os.environ.get("COLEXT_DATA_HOME_FOLDER"), dataset_name)
+            os.path.join(os.environ.get(EV.DATA_HOME_FOLDER), dataset_name)
         if public_dataset_csv is None:
             sampled_data = pd.read_csv(f"{public_dataset_home_folder}/metadata.csv")\
                 .sample(n=dataset_size, replace=False, random_state=10, axis=0)

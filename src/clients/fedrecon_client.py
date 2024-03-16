@@ -1,13 +1,9 @@
-from collections import OrderedDict
-
-import torch
 from torch.utils.data import random_split, DataLoader
 
 from src.clients.lg_fedavg_client import LgFedAvgClient
 from src.models.training_procedures import train_model_layers
 from src.helper.optimization_config import OptimizationConfig
-from src.helper.parameters import get_parameters, set_parameters
-from src.models.evaluation_procedures import test_accuracy
+from src.helper.parameters import set_parameters
 
 
 class FedReconClient(LgFedAvgClient):

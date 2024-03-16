@@ -1,7 +1,9 @@
-import json
 import importlib
 
 import torch
+
+from src.helper.filepaths import FilePaths as FP
+from src.helper.commons import read_json
 
 
 def construct_matrix(preds, targets, num_classes):
@@ -23,16 +25,14 @@ def init_model_from_string(class_string, n_classes, ratio, device):
 
 
 def init_model(client_capacity, n_classes, device, dataset):
-    with open("config/models/model_mapping.json", "r") as fp:
-        mapping = json.load(fp)
+    mapping = read_json(FP.GENERAL_MODEL_CONFIG, [])
     class_string = mapping[dataset][str(client_capacity)]
     model = init_model_from_string(class_string, n_classes, 1.0, device)
     return model
 
 
 def init_pt_model(client_capacity, n_classes, device, dataset, rate):
-    with open("config/models/pt_model_config.json", "r") as fp:
-        config = json.load(fp)
+    config = read_json(FP.PT_MODEL_CONFIG, [])
 
     class_string = config["base_models"][dataset]
     if rate is None:

@@ -1,9 +1,7 @@
 import os
 from logging import INFO
-from typing import Dict
 
 import flwr as fl
-from flwr.common import Config
 from flwr.common.logger import log
 import torch
 from torch.utils.data import DataLoader
@@ -113,7 +111,7 @@ class BaseClient(fl.client.NumPyClient):
 
     def _evaluate(self):
         dataset_size = None
-        out_dict = {"client_id": self.cid}
+        out_dict = {"client_id": self.cid, "client_capacity": self.client_capacity}
 
         if self.separate_val_test_sets:
             # compute accuracy on both validation and test datasets

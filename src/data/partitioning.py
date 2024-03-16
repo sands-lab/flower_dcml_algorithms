@@ -118,6 +118,25 @@ def _save_configs(trainsets, valsets, testsets, save_folder):
             df.to_csv(save_file, index=False)
 
 
+def _partition_client_dataset(client_partitions, partitioning_config):
+    trainsets, valsets, testsets = [], [], []
+    for partition_df in client_partitions.values():
+        test_size = int(partition_df.shape[0] * partitioning_config.test_percentage)
+        val_size = int(partition_df.shape[0] * partitioning_config.val_percentage)
+        partition_test_df = partition_df.iloc[:test_size]
+        ho_size = test_size + val_size
+        partition_val_df = partition_df.iloc[test_size:ho_size]
+        if partitioning_config.fixed_training_set_size > 0:
+            partition_train_df = \
+                partition_df.iloc[ho_size:ho_size+partitioning_config.fixed_training_set_size]
+        else:
+            partition_train_df = partition_df.iloc[ho_size:]
+        trainsets.append(partition_train_df)
+        valsets.append(partition_val_df)
+        testsets.append(partition_test_df)
+    return trainsets, valsets, testsets
+
+
 def _generate_dirichlet_partition(partitioning_config: DirichletPartitioning, metadata_df):
 
     metadata_df["idx"] = metadata_df["filename"].str.split(".").str[0].astype(int)
@@ -126,16 +145,10 @@ def _generate_dirichlet_partition(partitioning_config: DirichletPartitioning, me
                               seed=partitioning_config.seed,
                               min_size_of_dataset=partitioning_config.min_size_of_dataset,
                               alpha_value=partitioning_config.alpha)
-    trainsets, testsets = [], []
-    for subset in subsets.values():
-        partition_df = metadata_df[metadata_df["idx"].isin(subset)]
-        test_size = int(partition_df.shape[0] * partitioning_config.test_percentage)
-        partition_test_df = partition_df.iloc[:test_size]
-        partition_train_df = partition_df.iloc[test_size:]
-
-        trainsets.append(partition_train_df)
-        testsets.append(partition_test_df)
-    return trainsets, testsets
+    subsets = {
+        k: metadata_df.iloc[v] for k, v in subsets.items()
+    }
+    return _partition_client_dataset(subsets, partitioning_config)
 
 
 def _generate_IID_partitions(partitioning_config: IIDPartitioning, metadata_df: pd.DataFrame):
@@ -151,28 +164,14 @@ def _generate_IID_partitions(partitioning_config: IIDPartitioning, metadata_df: 
         client_partitions[i] = pd.concat(client_partitions[i], ignore_index=True)
         client_partitions[i] = client_partitions[i].sample(frac=1.0).reset_index(drop=True)
 
-    trainsets, valsets, testsets = [], [], []
-    for partition_df in client_partitions.values():
-        test_size = int(partition_df.shape[0] * partitioning_config.test_percentage)
-        val_size = int(partition_df.shape[0] * partitioning_config.val_percentage)
-        partition_test_df = partition_df.iloc[:test_size]
-        ho_size = test_size + val_size
-        partition_val_df = partition_df.iloc[test_size:ho_size]
-        if partitioning_config.fixed_training_set_size > 0:
-            partition_train_df = partition_df.iloc[ho_size:ho_size+partitioning_config.fixed_training_set_size]
-        else:
-            partition_train_df = partition_df.iloc[ho_size:]
-        trainsets.append(partition_train_df)
-        valsets.append(partition_val_df)
-        testsets.append(partition_test_df)
-
-    return trainsets, valsets, testsets
+    return _partition_client_dataset(client_partitions, partitioning_config)
 
 
 def _generate_shards_partition(partitioning_config: ShardsPartitioning, metadata_df):
 
     shards = []
-    shard_size = int(metadata_df.shape[0] / partitioning_config.n_clients / partitioning_config.n_shards)
+    shard_size = \
+        int(metadata_df.shape[0] / partitioning_config.n_clients / partitioning_config.n_shards)
 
     sorted_target_idxs = np.argsort(metadata_df["label"].values)
     for i in range(partitioning_config.n_shards * partitioning_config.n_clients):

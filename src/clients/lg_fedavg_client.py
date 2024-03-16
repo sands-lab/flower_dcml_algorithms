@@ -1,14 +1,12 @@
-import json
-
 import torch
 import torch.nn as nn
 
 from src.clients.base_client import BaseClient
 from src.models.helper import init_model_from_string
 from src.models.training_procedures import train
-from src.models.evaluation_procedures import test_accuracy
 from src.helper.parameters import get_parameters, set_parameters
-from src.helper.commons import sync_rng_state
+from src.helper.commons import sync_rng_state, read_json
+from src.helper.filepaths import FilePaths as FP
 from src.data.dataset_partition import DatasetPartition
 
 
@@ -18,10 +16,14 @@ class LgFedAvgClient(BaseClient):
         super().__init__(**kwargs, stateful_client=stateful_client)
 
     def _init_model(self):
-        with open("config/models/plft_model_config.json", "r") as fp:
-            model_config = json.load(fp)[self.dataset_name]["lg_fedavg"]
-        common_head = init_model_from_string(model_config["common_head"], None, None, self.device)
-        encoder = init_model_from_string(model_config["encoders"][str(self.client_capacity)], None, None, self.device)
+        model_config = read_json(FP.PLFT_MODEL_CONFIG, [self.dataset_name, "lg_fedavg"])
+        n_classes = read_json(FP.DATA_CONFIG, [self.dataset_name, "n_classes"])
+
+        model_kwargs = {"n_classes": n_classes, "ratio": None, "device": self.device}
+        common_head = init_model_from_string(model_config["common_head"], **model_kwargs)
+        encoder = init_model_from_string(
+            model_config["encoders"][str(self.client_capacity)], **model_kwargs
+        )
         print(f"Initialized model with encoder {encoder.__class__.__name__}")
         self.model = nn.Sequential(encoder, common_head)
 

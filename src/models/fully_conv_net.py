@@ -2,7 +2,6 @@ import copy
 
 import torch
 import torch.nn as nn
-import torch.nn.functional as F
 
 from src.models.abstract_model import AbstratModel, get_reduced_model_config
 
@@ -23,7 +22,7 @@ class Scaler(nn.Module):
 
 
 class AllConvNet(AbstratModel):
-    def __init__(self, model_config, rate, **kwargs):
+    def __init__(self, model_config, rate):
 
         super().__init__(model_config, rate)
         self.whole_model_config = copy.copy(model_config)
