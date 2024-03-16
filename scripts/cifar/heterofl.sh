@@ -18,7 +18,7 @@ for lte in "${EPOCHS[@]}"; do
             global_train.epochs=$MAX_GLOBAL_EPOCHS \
             data.dataset=cifar10 \
             data.partitioning_configuration=$data_config \
-            logging.constants=[v2,$DATA_CONFIG_STRING] \
+            logging.constants=[$DATA_CONFIG_STRING] \
             logging.name_keys=[local_train.local_epochs] \
             ray_client_resources.num_gpus=0.09
     done

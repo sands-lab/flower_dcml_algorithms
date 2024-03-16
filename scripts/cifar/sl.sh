@@ -6,7 +6,7 @@
 #SBATCH --gpus=1
 #SBATCH --output=logs/txt/cifar10/split_learning_additional_test.txt
 
-source ./cifar_scripts/common.sh
+source ./scripts/cifar/common.sh
 export PYTHONPATH=$PYTHONPATH:../slower
 
 # for lte in "${EPOCHS[@]}"; do

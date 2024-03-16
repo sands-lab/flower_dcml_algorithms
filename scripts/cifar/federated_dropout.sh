@@ -1,7 +1,7 @@
 #!/bin/bash
 
 #SBATCH --ntasks=1
-#SBATCH --time=18:00:00
+#SBATCH --time=12:00:00
 #SBATCH --cpus-per-task=28
 #SBATCH --gpus=2
 #SBATCH --output=logs/txt/cifar10/federated_dropout.txt
@@ -19,6 +19,7 @@ for lte in "${EPOCHS[@]}"; do
             data.dataset=cifar10 \
             data.partitioning_configuration=$data_config \
             logging.constants=[$DATA_CONFIG_STRING] \
-            logging.name_keys=[local_train.local_epochs]
+            logging.name_keys=[local_train.local_epochs] \
+            ray_client_resources.num_gpus=0.09
     done
 done

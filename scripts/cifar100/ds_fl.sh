@@ -1,7 +1,7 @@
 #!/bin/bash
 
 #SBATCH --ntasks=1
-#SBATCH --time=8:00:00
+#SBATCH --time=12:00:00
 #SBATCH --cpus-per-task=28
 #SBATCH --gpus=2
 #SBATCH --output=logs/txt/cifar100/ds_fl.txt

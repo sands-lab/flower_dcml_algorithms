@@ -8,7 +8,6 @@
 
 source ./scripts/cifar/common.sh
 
-
 for lte in "${EPOCHS[@]}"; do
 
     for data_config in "${DATA_CONFIGURATIONS[@]}"; do
