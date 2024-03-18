@@ -1,4 +1,3 @@
-import os
 from functools import partial
 
 import wandb
@@ -9,32 +8,22 @@ from dotenv import load_dotenv
 
 from slower.simulation.app import start_simulation
 
-from src.helper.commons import set_seed, load_data_config, generate_wandb_config
+from src.helper.commons import set_seed, generate_wandb_config
+from src.helper.commons import read_env_config
 from src.helper.evaluation import WandbEvaluation
+from src.helper.model_heterogeneity import inject_client_capacity, init_client_id_to_capacity_mapping
 from src.helper.fl_helper import construct_config_fn
 from src.sl.sl_client import client_fn
 from src.sl.sl_server_trainer import SlServerSegment
 from src.sl.sl_strategy import SlStrategy
-from fl import access_config
+from src.helper.wandb import access_config
 
 
-@hydra.main(version_base=None, config_path="conf", config_name="base_config")
+@hydra.main(version_base=None, config_path="config/hydra", config_name="base_config")
 def run(cfg):
     print(cfg)
 
-    data_home_folder = os.environ.get("FLTB_DATA_HOME_FOLDER")
-    log_to_wandb = bool(int(os.environ.get("LOG_TO_WANDB")))
-
-    partitions_home_folder = "./data/partitions"
-    partition_folder = \
-        f"{partitions_home_folder}/{cfg.data.dataset}/{cfg.data.partitioning_configuration}"
-
-    data_config = load_data_config(partition_folder)
-    n_classes = {
-        "cifar10": 10,
-        "mnist": 10,
-        "cinic": 10
-    }[data_config["dataset_name"]]
+    data_home_folder, partition_folder, log_to_wandb, data_config, n_classes = read_env_config(cfg)
 
     if log_to_wandb:
         extract = lambda k: k.split(".")[-1]
@@ -50,11 +39,11 @@ def run(cfg):
             config=wandb_config_dict,
             name=wandb_name
         )
-    evaluator = WandbEvaluation(log_to_wandb)
+    evaluator = WandbEvaluation(log_to_wandb, cfg.general.patience)
 
     set_seed(cfg.general.seed)
 
-    server_segment_fn_ = partial(SlServerSegment, dataset_name=data_config["dataset_name"], seed=cfg.general.seed)
+    server_segment_fn_ = partial(SlServerSegment, dataset_name=data_config["dataset_name"], seed=cfg.general.seed, n_classes=n_classes)
     fit_config_fn = lambda _: cfg.local_train
     client_fn_ = partial(
         client_fn,
@@ -62,6 +51,7 @@ def run(cfg):
         partition_folder=partition_folder,
         seed=cfg.general.seed,
         experiment_folder=None,
+        separate_val_test_sets=cfg.general.separate_val_test_sets
     )
     strategy = SlStrategy(
         evaluation_freq=cfg.global_train.evaluation_freq,
@@ -74,7 +64,16 @@ def run(cfg):
         fit_metrics_aggregation_fn=evaluator.fit_aggregation_fn
     )
 
-    tmp = cfg.ray_client_resources
+    random_client_capacities = \
+            init_client_id_to_capacity_mapping(
+                data_config["n_clients"],
+                3,
+                fixed_capacity=cfg.general.common_client_capacity
+            )
+
+    client_fn_ = partial(inject_client_capacity,
+                         client_fn=client_fn_,
+                         client_capacities=random_client_capacities)
     start_simulation(
         client_fn=client_fn_,
         num_clients=data_config["n_clients"],

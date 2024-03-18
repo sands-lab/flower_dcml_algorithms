@@ -5,7 +5,8 @@ WHOLE_MODEL_CONFIG = [3, 64, 96, 192, 192, 192, 192, 10]
 
 
 class SlEncoder(nn.Sequential):
-    def __init__(self):
+    def __init__(self, n_classes):
+        _ = (n_classes, )
         super().__init__(
             nn.Conv2d(WHOLE_MODEL_CONFIG[0], WHOLE_MODEL_CONFIG[1], 3, padding=1),
             nn.ReLU(),

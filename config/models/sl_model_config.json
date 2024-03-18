@@ -6,5 +6,9 @@
     "cinic": {
         "client_model": "src.models.sl_fully_conv_model.SlEncoder",
         "server_model": "src.models.sl_fully_conv_model.SlClfHead"
+    },
+    "cifar100": {
+        "client_model": "src.models.sl_fully_conv_model.SlEncoder",
+        "server_model": "src.models.sl_fully_conv_model.SlClfHead"
     }
 }

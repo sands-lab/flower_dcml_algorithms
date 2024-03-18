@@ -19,6 +19,7 @@ from slower.common import (
 from src.helper.commons import read_json, set_seed
 from src.helper.optimization_config import init_optimizer
 from src.helper.parameters import get_parameters, set_parameters
+from src.helper.filepaths import FilePaths as FP
 from src.data.helper import init_dataset
 from src.models.helper import simple_init_model_from_string
 from src.data.dataset_partition import DatasetPartition
@@ -33,6 +34,8 @@ class SlClient(NumPyClient):
         partition_folder,
         seed,
         experiment_folder,
+        client_capacity,
+        separate_val_test_sets
     ):
         self.cid = cid
         self.images_folder = images_folder
@@ -42,9 +45,10 @@ class SlClient(NumPyClient):
         self.experiment_folder = experiment_folder
         self.dataset_name = os.path.split(images_folder)[-1]
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-        self.model_name = \
-            read_json("config/models/sl_model_config.json", [self.dataset_name, "client_model"])
-        self.model = simple_init_model_from_string(self.model_name).to(self.device)
+        self.model_name = read_json(FP.SL_MODEL_CONFIG, [self.dataset_name, "client_model"])
+        self.model = simple_init_model_from_string(self.model_name, None).to(self.device)
+        self.client_capacity = client_capacity
+        self.separate_val_test_sets = separate_val_test_sets
 
     def get_parameters(self, config) -> NDArrays:
         return get_parameters(self.model)
@@ -103,17 +107,7 @@ class SlClient(NumPyClient):
         # print("finished training....", self.get_parameters({})[1][:3])
         return self.get_parameters({}), len(dataloader.dataset), {}
 
-    def evaluate(
-        self,
-        parameters,
-        server_model_segment_proxy: ServerModelSegmentProxy,
-        config
-    ) -> EvaluateRes:
-        dataloader = self._init_dataloader(DatasetPartition.TEST, 32)
-        self.model.eval()
-        set_parameters(self.model, parameters)
-        # print("starting evaluation....", self.get_parameters({})[1][:3])
-
+    def _get_accuracy(self, dataloader, server_model_segment_proxy):
         correct = 0
         for images, labels in dataloader:
             images = images.to(self.device)
@@ -129,7 +123,36 @@ class SlClient(NumPyClient):
         # print("finished evaluation....", self.get_parameters({})[1][:3])
 
         accuracy = float(correct / len(dataloader.dataset))
-        return accuracy, len(dataloader.dataset), {"accuracy": accuracy, "client_id": self.cid}
+        return accuracy
+
+    def evaluate(
+        self,
+        parameters,
+        server_model_segment_proxy: ServerModelSegmentProxy,
+        config
+    ) -> EvaluateRes:
+        self.model.eval()
+        set_parameters(self.model, parameters)
+
+        out_dict = {"client_id": self.cid, "client_capacity": self.client_capacity}
+        if self.separate_val_test_sets:
+            testloader = self._init_dataloader(DatasetPartition.TEST, 32)
+            accuracy = self._get_accuracy(testloader, server_model_segment_proxy)
+            out_dict["test_accuracy"] = accuracy
+            del testloader
+
+            valloader = self._init_dataloader(DatasetPartition.VAL, 32)
+            accuracy = self._get_accuracy(valloader, server_model_segment_proxy)
+            out_dict["accuracy"] = accuracy
+            dataset_size = len(valloader.dataset)
+        else:
+            testloader = self._init_dataloader(DatasetPartition.TEST, 32)
+            accuracy = self._get_accuracy(testloader, server_model_segment_proxy)
+            out_dict["accuracy"] = accuracy
+            dataset_size = len(testloader.dataset)
+        # print("starting evaluation....", self.get_parameters({})[1][:3])
+
+        return accuracy, dataset_size, out_dict
 
 
 def client_fn(cid, **kwargs) -> SlClient:

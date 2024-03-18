@@ -42,9 +42,9 @@ def init_pt_model(client_capacity, n_classes, device, dataset, rate):
     return model
 
 
-def simple_init_model_from_string(class_string):
+def simple_init_model_from_string(class_string, n_classes):
     module_name, class_name = class_string.rsplit('.', 1)
     module = importlib.import_module(module_name)
     class_ = getattr(module, class_name)
-    model = class_()
+    model = class_(n_classes)
     return model

@@ -1,5 +1,5 @@
 strategy:
   _target_: sl
-  single_training_client: true
+  single_training_client: false
 client:
   _target_: sl

@@ -12,19 +12,19 @@ from slower.server.server_model_segment.numpy_server_model_segment import NumPyS
 from src.helper.commons import read_json, set_seed
 from src.helper.optimization_config import init_optimizer
 from src.helper.parameters import get_parameters, set_parameters
+from src.helper.filepaths import FilePaths as FP
 from src.models.helper import simple_init_model_from_string
 
 
 class SlServerSegment(NumPyServerModelSegment):
 
-    def __init__(self, dataset_name, seed) -> None:
+    def __init__(self, dataset_name, seed, n_classes) -> None:
         super().__init__()
         self.dataset_name = dataset_name
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-        self.model_name = \
-            read_json("config/models/sl_model_config.json", [self.dataset_name, "server_model"])
+        self.model_name = read_json(FP.SL_MODEL_CONFIG, [self.dataset_name, "server_model"])
         set_seed(seed * 2 + 1)  # seems to get better performance if we use different seeds on client and server
-        self.model = simple_init_model_from_string(self.model_name).to(self.device)
+        self.model = simple_init_model_from_string(self.model_name, n_classes).to(self.device)
         self.criterion = torch.nn.CrossEntropyLoss()
 
     def serve_prediction_request(self, embeddings) -> bytes:
