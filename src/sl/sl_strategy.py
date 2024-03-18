@@ -10,6 +10,7 @@ class SlStrategy(PlainSlStrategy):
         self.evaluation_freq = evaluation_freq
         self.single_training_client = single_training_client
         self.client_order = []
+        self.converged = False
 
     def _initialize_client_training_order(self, client_manager):
         assert self.single_training_client
@@ -18,6 +19,8 @@ class SlStrategy(PlainSlStrategy):
         print(f"Generated following client order: {self.client_order}")
 
     def configure_client_fit(self, server_round, parameters, client_manager):
+        if self.converged:
+            return []
         if not self.single_training_client:
             return super().configure_client_fit(server_round, parameters, client_manager)
         # only one client is supposed to be training at a time as in the vanilla SL framework
@@ -40,6 +43,9 @@ class SlStrategy(PlainSlStrategy):
         self, server_round, parameters, client_manager
     ):
         eval_ins = []
-        if server_round % self.evaluation_freq == 0:
+        if server_round % self.evaluation_freq == 0 and not self.converged:
             eval_ins = super().configure_client_evaluate(server_round, parameters, client_manager)
         return eval_ins
+
+    def set_converged(self):
+        self.converged = True

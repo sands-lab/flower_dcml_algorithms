@@ -63,6 +63,7 @@ def run(cfg):
         evaluate_metrics_aggregation_fn=evaluator.eval_aggregation_fn,
         fit_metrics_aggregation_fn=evaluator.fit_aggregation_fn
     )
+    evaluator.set_strategy(strategy)
 
     random_client_capacities = \
             init_client_id_to_capacity_mapping(
