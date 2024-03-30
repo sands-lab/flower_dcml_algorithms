@@ -1,0 +1,19 @@
+project: slwr # project name should not have spaces
+job_name: "SOTA FL experiment"
+
+code:
+  # Path can be omited if colext_config.yaml is in the root folder of the project
+  path: "/home/radovib/fl_algorithms"
+  client:
+    entrypoint: "run_client.py"
+    args: "fl_algorithm={{ fl_algorithm }} data.partitioning_configuration={{ data_config }} {{ more_config }}"
+
+  server:
+    entrypoint: run_server.py
+    args: "fl_algorithm={{ fl_algorithm }} data.partitioning_configuration={{ data_config }} {{ more_config }}"
+
+devices:
+  - { device_type: JetsonAGXOrin,  count: 1 }
+  - { device_type: JetsonOrinNano, count: 1 }
+  - { device_type: LattePandaDelta3, count: 1 }
+  - { device_type: OrangePi5B, count: 1 }

@@ -1,4 +1,6 @@
 {
-    "jetson": 0,
-    "orangepi": 1
+    "JetsonAGXOrin": 0,
+    "JetsonOrinNano": 0,
+    "LattePandaDelta3": 1,
+    "OrangePi5B": 2
 }

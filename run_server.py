@@ -17,10 +17,12 @@ from src.fl.client_manager import HeterogeneousClientManager
 from src.helper.environment_variables import EnvironmentVariables as EV
 
 
+os.environ["HYDRA_FULL_ERROR"] = "1"
+
 @hydra.main(version_base=None, config_path="config/hydra", config_name="base_config")
 def main(cfg):
 
-    server_ip = os.environ.get(EV.SERVER_ADDRESS)
+    server_ip = "0.0.0.0:8080"  # os.environ.get(EV.SERVER_ADDRESS)
     _, _, log_to_wandb, data_config, n_classes = read_env_config(cfg)
     log(INFO, f"Logging to wandb set to {log_to_wandb}")
 
@@ -28,21 +30,18 @@ def main(cfg):
         init_wandb(cfg, data_config)
     evaluator = WandbEvaluation(log_to_wandb, patience=cfg.general.patience)
 
-
-    # Create strategy
-    n_clients = int(data_config["n_clients"])
-    log(INFO, f"Waiting for {n_clients} clients...")
-
     set_seed(cfg.general.seed)
+    n_clients = int(os.getenv(EV.N_CLIENTS, 1))
+    print(f"Running server expecting {n_clients} clients...")
     strategy = instantiate(
         cfg.fl_algorithm.strategy,
         n_classes=n_classes,
         evaluation_freq=cfg.global_train.evaluation_freq,
         fraction_fit=cfg.global_train.fraction_fit,
         fraction_evaluate=cfg.global_train.fraction_eval,
-        min_fit_clients=1,
-        min_evaluate_clients=1,
-        min_available_clients=1,
+        min_fit_clients=n_clients,
+        min_evaluate_clients=n_clients,
+        min_available_clients=n_clients,
         evaluate_metrics_aggregation_fn=evaluator.eval_aggregation_fn,
         fit_metrics_aggregation_fn=evaluator.fit_aggregation_fn,
         on_fit_config_fn=construct_config_fn(OmegaConf.to_container(cfg.local_train), evaluator)
@@ -53,7 +52,7 @@ def main(cfg):
     log(INFO, f"Starting server on IP: {server_ip}")
     fl.server.start_server(
         server_address=server_ip,
-        client_manager=HeterogeneousClientManager(),
+        client_manager=HeterogeneousClientManager(n_clients),
         strategy=strategy,
         config=fl.server.ServerConfig(num_rounds=cfg.global_train.epochs),
     )
