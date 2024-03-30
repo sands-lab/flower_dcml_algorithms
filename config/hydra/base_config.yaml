@@ -18,6 +18,7 @@ local_train:  # passed to the client in the config file
 general:
   seed: 10
   common_client_capacity: null
+  low_high_ratio: null
   separate_val_test_sets: true
   patience: 4
 ray_client_resources:

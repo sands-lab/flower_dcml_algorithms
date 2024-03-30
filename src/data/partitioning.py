@@ -139,7 +139,6 @@ def _partition_client_dataset(client_partitions, partitioning_config):
 
 def _generate_dirichlet_partition(partitioning_config: DirichletPartitioning, metadata_df):
 
-    metadata_df["idx"] = metadata_df["filename"].str.split(".").str[0].astype(int)
     subsets = dirichlet_split(metadata_df["label"],
                               num_clients=partitioning_config.n_clients,
                               seed=partitioning_config.seed,

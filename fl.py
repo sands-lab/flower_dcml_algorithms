@@ -67,8 +67,10 @@ def run(cfg):
             init_client_id_to_capacity_mapping(
                 data_config["n_clients"],
                 3,
-                fixed_capacity=cfg.general.common_client_capacity
+                fixed_capacity=cfg.general.common_client_capacity,
+                low_high_ratio=cfg.general.low_high_ratio,
             )
+        print(json.dumps(random_client_capacities, indent=2))
 
         client_id_to_capacity_mapping_file = f"{temp_dir}/model_capacities.json"
         with open(client_id_to_capacity_mapping_file, "w") as fp:
