@@ -5,6 +5,7 @@ outputs/
 wandb/
 artifacts/
 secrets.env
+scripts/
 
 *.log
 *.txt
