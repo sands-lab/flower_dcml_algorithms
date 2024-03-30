@@ -88,7 +88,7 @@ def run(cfg):
             config=fl.server.ServerConfig(num_rounds=cfg.global_train.epochs),
             strategy=strategy,
             client_resources=client_resources,
-            client_manager=HeterogeneousClientManager()
+            client_manager=HeterogeneousClientManager(data_config["n_clients"])
         )
 
     if log_to_wandb:

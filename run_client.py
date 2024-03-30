@@ -22,7 +22,11 @@ def main(cfg):
     server_ip = os.environ.get(EV.SERVER_ADDRESS)
     print(client_idx)
 
-    client_capacity = get_client_capacity(client_idx, None)
+    if cfg.general.common_client_capacity is None:
+        client_capacity = get_client_capacity(client_idx, None)
+    else:
+        # only use this for FedAvg
+        client_capacity = int(cfg.general.common_client_capacity)
 
     client_fn = instantiate(cfg.fl_algorithm.client, _partial_=True)
     with tempfile.TemporaryDirectory(dir="data/client") as temp_dir:

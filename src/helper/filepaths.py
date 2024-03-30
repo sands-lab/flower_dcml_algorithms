@@ -8,3 +8,5 @@ class FilePaths:
     SL_MODEL_CONFIG = "config/models/sl_model_config.json"
     GENERAL_MODEL_CONFIG = "config/models/model_mapping.json"
     DEVICE_TYPE_TO_CAPACITY_CONFIG = "config/colext/device_capacities.json"
+    COLEXT_TEMPLATE = "config/colext/colext_config_template.yaml"
+    COLEXT_CONFIG = "./colext_config.yaml"

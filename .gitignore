@@ -18,3 +18,7 @@ secrets.env
 
 # specific files
 jupyter.sh
+colext_config.yaml
+buildkitd.toml
+reinstall_colext.sh
+submit_colext_experiments.sh

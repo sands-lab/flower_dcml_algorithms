@@ -5,9 +5,10 @@ from flwr.server.client_proxy import ClientProxy
 
 class HeterogeneousClientManager(SimpleClientManager):
 
-    def __init__(self):
+    def __init__(self, n_clients):
         super().__init__()
         self.client_to_capacity_mapping = {}
+        self.n_clients = n_clients
 
     def unregister(self, client: ClientProxy) -> None:
         super().unregister(client)
@@ -26,6 +27,7 @@ class HeterogeneousClientManager(SimpleClientManager):
                 res = client_proxy.get_properties(noins, None)
                 capacity = res.properties["client_capacity"]
                 self.client_to_capacity_mapping[cid] = capacity
+                print(f"{cid} has capacity {capacity}")
 
     def sample(self, *args, **kwargs):
         clients = super().sample(*args, **kwargs)
@@ -35,3 +37,6 @@ class HeterogeneousClientManager(SimpleClientManager):
     def all(self):
         self.sync_client_to_capacity(self.clients.values())
         return self.clients
+
+    def wait_clients(self):
+        self.wait_for(self.n_clients)

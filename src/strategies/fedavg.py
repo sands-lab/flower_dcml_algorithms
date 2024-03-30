@@ -4,8 +4,17 @@ from flwr.server.strategy import FedAvg as FlFedAvg
 from flwr.common import parameters_to_ndarrays, Parameters
 
 from src.fl.client_manager import HeterogeneousClientManager
+from src.helper.commons import maybe_decorate
+
+try:
+    from colext import MonitorFlwrStrategy
+    is_colext_experiment = True
+except ImportError:
+    is_colext_experiment = False
+    print("Did not find colext. Client will not be decorated...")
 
 
+@maybe_decorate(is_colext_experiment, MonitorFlwrStrategy)
 class FedAvg(FlFedAvg):
 
     def __init__(self, n_classes, evaluation_freq, filter_capacity=None, **kwargs):
@@ -35,10 +44,15 @@ class FedAvg(FlFedAvg):
         self, client_manager: HeterogeneousClientManager
     ) -> Optional[Parameters]:
         """Initialize global model parameters."""
+        client_manager.wait_clients()
         if self.filter_capacity is not None:
             # Want to train only clients with a given capacity... unregister all clients
             # with a different capacity
             self._unregister_clients(client_manager)
+        if len(client_manager.all()) == 0:
+            self.set_converged()
+            print("No available clients... Set converged to true")
+            return Parameters(b"", "")
 
         return super().initialize_parameters(client_manager)
 
