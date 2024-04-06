@@ -14,6 +14,6 @@ code:
 
 devices:
   - { device_type: JetsonAGXOrin,  count: 1 }
-  - { device_type: JetsonOrinNano, count: 1 }
-  - { device_type: LattePandaDelta3, count: 1 }
-  - { device_type: OrangePi5B, count: 1 }
+  - { device_type: JetsonOrinNano, count: 3 }
+  - { device_type: LattePandaDelta3, count: 4 }
+  - { device_type: OrangePi5B, count: 6 }

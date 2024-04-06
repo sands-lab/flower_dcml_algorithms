@@ -26,12 +26,14 @@ def main(cfg):
     _, _, log_to_wandb, data_config, n_classes = read_env_config(cfg)
     log(INFO, f"Logging to wandb set to {log_to_wandb}")
 
+    n_clients = int(os.getenv(EV.N_CLIENTS, 1))
+    data_config["colext_job_id"] = os.getenv(EV.COLEXT_JOB_ID, "???")
+    data_config["num_colext_clients"] = n_clients
     if log_to_wandb:
         init_wandb(cfg, data_config)
     evaluator = WandbEvaluation(log_to_wandb, patience=cfg.general.patience)
 
     set_seed(cfg.general.seed)
-    n_clients = int(os.getenv(EV.N_CLIENTS, 1))
     print(f"Running server expecting {n_clients} clients...")
     strategy = instantiate(
         cfg.fl_algorithm.strategy,
@@ -67,4 +69,5 @@ if __name__ == "__main__":
     if os.environ.get(EV.IBEX_SIMULATION, "0") != "0":
         log(WARNING, "Loading environment variables from `.env. This should only happen if you are running things in a simulation environment")
         load_dotenv()
+    load_dotenv("secrets.env", override=True)
     main()

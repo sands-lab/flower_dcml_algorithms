@@ -11,6 +11,7 @@ from src.helper.model_heterogeneity import get_client_capacity
 from src.helper.commons import read_env_config
 from src.helper.environment_variables import EnvironmentVariables as EV
 
+os.environ["HYDRA_FULL_ERROR"] = "1"
 
 @hydra.main(version_base=None, config_path="config/hydra", config_name="base_config")
 def main(cfg):

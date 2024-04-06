@@ -53,6 +53,9 @@ class FedAvg(FlFedAvg):
             self.set_converged()
             print("No available clients... Set converged to true")
             return Parameters(b"", "")
+        self.min_fit_clients = len(client_manager.all())
+        self.min_evaluate_clients = len(client_manager.all())
+        self.min_available_clients = len(client_manager.all())
 
         return super().initialize_parameters(client_manager)
 
