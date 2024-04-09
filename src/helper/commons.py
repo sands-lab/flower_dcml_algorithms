@@ -120,7 +120,3 @@ def read_env_config(cfg):
     log_to_wandb = bool(int(os.environ.get(EV.LOG_TO_WANDB, 0)))
     print(f"Logging to W&B set to: {log_to_wandb}")
     return data_home_folder, partition_folder, log_to_wandb, data_config, n_classes
-
-
-def maybe_decorate(condition, decorator):
-    return decorator if condition else lambda x: x

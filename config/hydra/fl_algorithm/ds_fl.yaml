@@ -1,5 +1,5 @@
 client:
-  _target_: src.clients.ds_fl_client.client_fn
+  _target_: src.clients.ds_fl_client.DS_FLClient
   kd_temperature: 1.0
 strategy:
   _target_: src.strategies.ds_fl.DS_FL

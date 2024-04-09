@@ -24,7 +24,7 @@ def init_wandb(cfg, data_config):
         [f"{extract(k)}{access_config(cfg, k)}" for k in cfg.logging.name_keys]
     )
     print("Logging to wandb...")
-    wandb_config_dict = generate_wandb_config(OmegaConf.to_container(cfg)) | data_config
+    wandb_config_dict = {**generate_wandb_config(OmegaConf.to_container(cfg)), **data_config}
     wandb.init(
         config=wandb_config_dict,
         name=wandb_name

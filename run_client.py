@@ -1,16 +1,19 @@
 import os
 import tempfile
+import importlib
 
 import flwr as fl
 import hydra
-from hydra.utils import instantiate
+from hydra.core.config_store import OmegaConf
 from dotenv import load_dotenv
 
+from colext import MonitorFlwrClient
 
 from src.helper.model_heterogeneity import get_client_capacity
 from src.helper.commons import read_env_config
 from src.helper.environment_variables import EnvironmentVariables as EV
 
+os.environ["HYDRA_FULL_ERROR"] = "1"
 
 @hydra.main(version_base=None, config_path="config/hydra", config_name="base_config")
 def main(cfg):
@@ -28,18 +31,28 @@ def main(cfg):
         # only use this for FedAvg
         client_capacity = int(cfg.general.common_client_capacity)
 
-    client_fn = instantiate(cfg.fl_algorithm.client, _partial_=True)
+    # Split the string to get the module name and class name
+    client_init_kwargs = OmegaConf.to_container(cfg.fl_algorithm.client)
+    client_class_str = client_init_kwargs.pop("_target_")
+    module_name, class_name = client_class_str.rsplit(".", 1)
+    module = importlib.import_module(module_name)
+
+    # Get the class from the module
+    client_class = getattr(module, class_name)
+    client_class = MonitorFlwrClient(client_class)
+
     with tempfile.TemporaryDirectory(dir="data/client") as temp_dir:
 
         # instantiate the client
-        client = client_fn(
+        client = client_class(
             cid=client_idx,
             client_capacity=client_capacity,
             images_folder=f"{data_home_folder}/{cfg.data.dataset}",
             partition_folder=partition_folder,
             seed=cfg.general.seed,
             experiment_folder=temp_dir,
-            separate_val_test_sets=cfg.general.separate_val_test_sets
+            separate_val_test_sets=cfg.general.separate_val_test_sets,
+            **client_init_kwargs
         )
 
         # start the client
