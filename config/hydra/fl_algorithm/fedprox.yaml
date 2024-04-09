@@ -1,5 +1,5 @@
 client:
-  _target_: src.clients.fedprox_client.client_fn
+  _target_: src.clients.fedprox_client.FedProxClient
 strategy:
   _target_: src.strategies.fedprox.FedProx
   proximal_mu: 0.0001

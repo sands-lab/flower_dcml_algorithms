@@ -6,6 +6,7 @@ wandb/
 artifacts/
 secrets.env
 scripts/
+old/
 
 *.log
 *.txt
@@ -23,3 +24,4 @@ colext_config.yaml
 buildkitd.toml
 reinstall_colext.sh
 submit_colext_experiments.sh
+download_colext_data.sh

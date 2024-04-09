@@ -7,21 +7,15 @@ import torch
 from torch.utils.data import DataLoader
 
 from src.helper.parameters import get_parameters, set_parameters
-from src.helper.commons import set_seed, save_rng_state_if_not_exists, sync_rng_state, maybe_decorate
+from src.helper.commons import set_seed, save_rng_state_if_not_exists, sync_rng_state
 from src.helper.optimization_config import OptimizationConfig
 from src.data.helper import init_dataset
 from src.models.evaluation_procedures import test_accuracy
 from src.models.helper import init_model
 from src.data.dataset_partition import DatasetPartition
 
-try:
-    from colext import MonitorFlwrClient
-    is_colext_experiment = True
-except ImportError:
-    is_colext_experiment = False
-    print("Did not find colext. Client will not be decorated...")
 
-@maybe_decorate(is_colext_experiment, MonitorFlwrClient)
+
 class BaseClient(fl.client.NumPyClient):
 
     def __init__(
@@ -37,7 +31,7 @@ class BaseClient(fl.client.NumPyClient):
             separate_val_test_sets = False
     ):
         super().__init__()
-        self.cid = cid
+        self.cid = int(cid)
         self.seed = seed
         self.strict_load = strict_load
         self.stateful_client = stateful_client

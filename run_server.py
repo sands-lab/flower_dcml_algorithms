@@ -1,13 +1,15 @@
 import os
+import importlib
 
 import flwr as fl
 from logging import INFO, WARNING
 from flwr.common.logger import log
 import hydra
-from hydra.utils import instantiate
 from hydra.core.config_store import OmegaConf
 import wandb
 from dotenv import load_dotenv
+
+from colext import MonitorFlwrStrategy
 
 from src.helper.evaluation import WandbEvaluation
 from src.helper.fl_helper import construct_config_fn
@@ -35,8 +37,17 @@ def main(cfg):
 
     set_seed(cfg.general.seed)
     print(f"Running server expecting {n_clients} clients...")
-    strategy = instantiate(
-        cfg.fl_algorithm.strategy,
+
+    strategy_init_kwargs = OmegaConf.to_container(cfg.fl_algorithm.strategy)
+    client_class_str = strategy_init_kwargs.pop("_target_")
+
+    module_name, class_name = client_class_str.rsplit(".", 1)
+    module = importlib.import_module(module_name)
+
+    strategy_class = getattr(module, class_name)
+    strategy_class = MonitorFlwrStrategy(strategy_class)
+
+    strategy = strategy_class(
         n_classes=n_classes,
         evaluation_freq=cfg.global_train.evaluation_freq,
         fraction_fit=cfg.global_train.fraction_fit,
@@ -46,7 +57,8 @@ def main(cfg):
         min_available_clients=n_clients,
         evaluate_metrics_aggregation_fn=evaluator.eval_aggregation_fn,
         fit_metrics_aggregation_fn=evaluator.fit_aggregation_fn,
-        on_fit_config_fn=construct_config_fn(OmegaConf.to_container(cfg.local_train), evaluator)
+        on_fit_config_fn=construct_config_fn(OmegaConf.to_container(cfg.local_train), evaluator),
+        **strategy_init_kwargs
     )
     strategy.set_dataset_name(data_config["dataset_name"])
     evaluator.set_strategy(strategy)

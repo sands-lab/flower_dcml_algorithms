@@ -1,5 +1,5 @@
 client:
-  _target_: src.clients.feddf_client.client_fn
+  _target_: src.clients.feddf_client.FedDFClient
 strategy:
   _target_: src.strategies.feddf.FedDF
   proximal_mu: 0.0001  # feddf uses a proximal term for local training as in the FedProx paper

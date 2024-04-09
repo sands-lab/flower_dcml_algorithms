@@ -4,17 +4,8 @@ from flwr.server.strategy import FedAvg as FlFedAvg
 from flwr.common import parameters_to_ndarrays, Parameters
 
 from src.fl.client_manager import HeterogeneousClientManager
-from src.helper.commons import maybe_decorate
-
-try:
-    from colext import MonitorFlwrStrategy
-    is_colext_experiment = True
-except ImportError:
-    is_colext_experiment = False
-    print("Did not find colext. Client will not be decorated...")
 
 
-@maybe_decorate(is_colext_experiment, MonitorFlwrStrategy)
 class FedAvg(FlFedAvg):
 
     def __init__(self, n_classes, evaluation_freq, filter_capacity=None, **kwargs):

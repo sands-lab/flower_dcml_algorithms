@@ -1,5 +1,5 @@
 client:
-  _target_: src.clients.fedkd_client.client_fn
+  _target_: src.clients.fedkd_client.FedKDClient
   temperature: 1.0  # in the paper they never mention the temperature
 strategy:
   _target_: src.strategies.fedkd.FedKD
