@@ -5,8 +5,9 @@ from slower.server.strategy import PlainSlStrategy
 
 
 class SlStrategy(PlainSlStrategy):
-    def __init__(self, evaluation_freq, single_training_client, **kwargs):
+    def __init__(self, evaluation_freq, single_training_client, n_classes, **kwargs):
         super().__init__(**kwargs)
+        _ = (n_classes,)
         self.evaluation_freq = evaluation_freq
         self.single_training_client = single_training_client
         self.client_order = []
@@ -49,3 +50,8 @@ class SlStrategy(PlainSlStrategy):
 
     def set_converged(self):
         self.converged = True
+
+    def set_dataset_name(self, dataset_name):
+        # just for compatibility
+        _ = (dataset_name,)
+        pass

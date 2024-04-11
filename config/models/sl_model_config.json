@@ -1,14 +1,35 @@
 {
     "cifar10": {
-        "client_model": "src.models.sl_fully_conv_model.SlEncoder",
-        "server_model": "src.models.sl_fully_conv_model.SlClfHead"
+        "plain": {
+            "client_model": "src.models.sl_fully_conv_model.SlEncoder",
+            "server_model": "src.models.sl_fully_conv_model.SlClfHead"
+        },
+        "u": {
+            "client_model": "src.models.sl_fully_conv_model.SlEncoder",
+            "server_model": "src.models.sl_fully_conv_model.SlServerEncoder",
+            "client_head": "src.models.sl_fully_conv_model.SlClientClfHead"
+        }
     },
     "cinic": {
-        "client_model": "src.models.sl_fully_conv_model.SlEncoder",
-        "server_model": "src.models.sl_fully_conv_model.SlClfHead"
+        "plain": {
+            "client_model": "src.models.sl_fully_conv_model.SlEncoder",
+            "server_model": "src.models.sl_fully_conv_model.SlClfHead"
+        },
+        "u": {
+            "client_model": "src.models.sl_fully_conv_model.SlEncoder",
+            "server_model": "src.models.sl_fully_conv_model.SlServerEncoder",
+            "client_head": "src.models.sl_fully_conv_model.SlClientClfHead"
+        }
     },
     "cifar100": {
-        "client_model": "src.models.sl_fully_conv_model.SlEncoder",
-        "server_model": "src.models.sl_fully_conv_model.SlClfHead"
+        "plain": {
+            "client_model": "src.models.sl_fully_conv_model.SlEncoder",
+            "server_model": "src.models.sl_fully_conv_model.SlClfHead"
+        },
+        "u": {
+            "client_model": "src.models.sl_fully_conv_model.SlEncoder",
+            "server_model": "src.models.sl_fully_conv_model.SlServerEncoder",
+            "client_head": "src.models.sl_fully_conv_model.SlClientClfHead"
+        }
     }
 }

@@ -27,10 +27,10 @@ ray_client_resources:
   num_gpus: 0.16
 logging:
   name_keys: # use [] if no log name values apart from fl_algorithm name
-    - "fl_algorithm.client.common_client_capacity"
+    # - "fl_algorithm.client.common_client_capacity"
     - "local_train.local_epochs"
-    - "local_train.lr"
-    - "local_train.batch_size"
+    # - "local_train.lr"
+    # - "local_train.batch_size"
   constants: []
 
 hydra:

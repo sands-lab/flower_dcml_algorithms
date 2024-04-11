@@ -7,7 +7,12 @@ import hydra
 from hydra.core.config_store import OmegaConf
 from dotenv import load_dotenv
 
-from colext import MonitorFlwrClient
+try:
+    from colext import MonitorFlwrClient # type: ignore
+except ModuleNotFoundError:
+    print("Colext not found. Skipping...")
+    MonitorFlwrClient = lambda cls: cls
+from slower.client.app import start_client as sl_start_client
 
 from src.helper.model_heterogeneity import get_client_capacity
 from src.helper.commons import read_env_config
@@ -15,8 +20,11 @@ from src.helper.environment_variables import EnvironmentVariables as EV
 
 os.environ["HYDRA_FULL_ERROR"] = "1"
 
+
 @hydra.main(version_base=None, config_path="config/hydra", config_name="base_config")
 def main(cfg):
+    print(cfg.fl_algorithm)
+    is_split_learning = "server_model" in cfg.fl_algorithm
 
     data_home_folder, partition_folder, _, _, _ = read_env_config(cfg)
 
@@ -56,10 +64,13 @@ def main(cfg):
         )
 
         # start the client
-        fl.client.start_client(server_address=server_ip, client=client.to_client())
+        if is_split_learning:
+            sl_start_client(server_address=server_ip, client=client.to_client())
+        else:
+            fl.client.start_client(server_address=server_ip, client=client.to_client())
 
 
 if __name__ == "__main__":
     if os.environ.get(EV.IBEX_SIMULATION, "1") != "0":
-        load_dotenv()
+        load_dotenv(override=True)
     main()

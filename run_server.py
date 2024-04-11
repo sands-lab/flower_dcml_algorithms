@@ -5,11 +5,17 @@ import flwr as fl
 from logging import INFO, WARNING
 from flwr.common.logger import log
 import hydra
+from hydra.utils import instantiate
 from hydra.core.config_store import OmegaConf
 import wandb
 from dotenv import load_dotenv
 
-from colext import MonitorFlwrStrategy
+try:
+    from colext import MonitorFlwrStrategy # type: ignore
+except ModuleNotFoundError:
+    print("Colext not found")
+    MonitorFlwrStrategy = lambda cls: cls
+from slower.server.app import start_server as sl_start_server
 
 from src.helper.evaluation import WandbEvaluation
 from src.helper.fl_helper import construct_config_fn
@@ -23,6 +29,7 @@ os.environ["HYDRA_FULL_ERROR"] = "1"
 
 @hydra.main(version_base=None, config_path="config/hydra", config_name="base_config")
 def main(cfg):
+    is_split_learning = "server_model" in cfg.fl_algorithm
 
     server_ip = "0.0.0.0:8080"  # os.environ.get(EV.SERVER_ADDRESS)
     _, _, log_to_wandb, data_config, n_classes = read_env_config(cfg)
@@ -47,6 +54,23 @@ def main(cfg):
     strategy_class = getattr(module, class_name)
     strategy_class = MonitorFlwrStrategy(strategy_class)
 
+    if is_split_learning:
+        fit_config_fns = {
+            "config_client_fit_fn": construct_config_fn(OmegaConf.to_container(cfg.local_train), evaluator),
+            "config_server_segnent_fn": construct_config_fn(OmegaConf.to_container(cfg.local_train), None)
+        }
+        server_model_init_fn = instantiate(
+            cfg.fl_algorithm.server_model,
+            dataset_name=data_config["dataset_name"],
+            seed=cfg.general.seed,
+            n_classes=n_classes,
+            _partial_=True
+        )
+        strategy_init_kwargs["init_server_model_fn"] = server_model_init_fn
+    else:
+        fit_config_fns = {
+            "on_fit_config_fn": construct_config_fn(OmegaConf.to_container(cfg.local_train), evaluator)
+        }
     strategy = strategy_class(
         n_classes=n_classes,
         evaluation_freq=cfg.global_train.evaluation_freq,
@@ -57,19 +81,26 @@ def main(cfg):
         min_available_clients=n_clients,
         evaluate_metrics_aggregation_fn=evaluator.eval_aggregation_fn,
         fit_metrics_aggregation_fn=evaluator.fit_aggregation_fn,
-        on_fit_config_fn=construct_config_fn(OmegaConf.to_container(cfg.local_train), evaluator),
+        **fit_config_fns,
         **strategy_init_kwargs
     )
     strategy.set_dataset_name(data_config["dataset_name"])
     evaluator.set_strategy(strategy)
 
     log(INFO, f"Starting server on IP: {server_ip}")
-    fl.server.start_server(
-        server_address=server_ip,
-        client_manager=HeterogeneousClientManager(n_clients),
-        strategy=strategy,
-        config=fl.server.ServerConfig(num_rounds=cfg.global_train.epochs),
-    )
+    if is_split_learning:
+        sl_start_server(
+            server_address=server_ip,
+            strategy=strategy,
+            config=fl.server.ServerConfig(num_rounds=cfg.global_train.epochs),
+        )
+    else:
+        fl.server.start_server(
+            server_address=server_ip,
+            client_manager=HeterogeneousClientManager(n_clients),
+            strategy=strategy,
+            config=fl.server.ServerConfig(num_rounds=cfg.global_train.epochs),
+        )
     log(INFO, "Experiment completed.")
     if log_to_wandb:
         log(INFO, "Syncing wandb to local folder...")
@@ -80,6 +111,6 @@ def main(cfg):
 if __name__ == "__main__":
     if os.environ.get(EV.IBEX_SIMULATION, "0") != "0":
         log(WARNING, "Loading environment variables from `.env. This should only happen if you are running things in a simulation environment")
-        load_dotenv()
+        load_dotenv(override=True)
     load_dotenv("secrets.env", override=True)
     main()

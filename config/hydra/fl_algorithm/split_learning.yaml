@@ -1,5 +1,10 @@
 strategy:
-  _target_: sl
+  _target_: src.sl.sl_strategy.SlStrategy
   single_training_client: false
+  common_server: false
+server_model:
+  _target_: src.sl.sl_server_model.SlServerModel
+  sl_configuration: plain
 client:
-  _target_: sl
+  _target_: src.sl.sl_client.SlClient
+  sl_configuration: plain
