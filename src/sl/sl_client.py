@@ -47,7 +47,6 @@ class SlClient(NumPyClient):
         if not os.path.isdir(self.client_working_folder):
             os.mkdir(self.client_working_folder)
 
-        set_seed(self.seed)
         self.dataset_name = os.path.split(images_folder)[-1]
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         if sl_configuration == "plain":
@@ -63,6 +62,7 @@ class SlClient(NumPyClient):
             self.clf_head = \
                 simple_init_model_from_string(self.model_name["client_head"], self.n_classes).to(self.device)
 
+        set_seed(self.seed)
         save_rng_state_if_not_exists(self.client_working_folder)
 
     def get_parameters(self, config) -> NDArrays:
@@ -99,7 +99,7 @@ class SlClient(NumPyClient):
     @sync_rng_state
     def fit(self, parameters, config) -> FitRes:
         print(f"Fitting client {self.cid} {self.encoder.__class__.__name__}")
-        set_parameters(self.encoder, parameters)
+        self.set_parameters(parameters)
         dataloader = self._init_dataloader(DatasetPartition.TRAIN, config["batch_size"])
 
         if self.sl_configuration == "plain":
@@ -154,7 +154,7 @@ class SlClient(NumPyClient):
     ) -> EvaluateRes:
         _ = (config,)
         self.encoder.eval()
-        set_parameters(self.encoder, parameters)
+        self.set_parameters(parameters)
 
         out_dict = {"client_id": self.cid, "client_capacity": self.client_capacity}
         if self.separate_val_test_sets:

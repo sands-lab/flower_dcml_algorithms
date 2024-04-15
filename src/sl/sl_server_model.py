@@ -6,7 +6,7 @@ from flwr.common import GetParametersRes
 
 from slower.server.server_model.numpy_server_model import NumPyServerModel
 
-from src.helper.commons import read_json, set_seed
+from src.helper.commons import read_json
 from src.helper.optimization_config import init_optimizer
 from src.helper.parameters import get_parameters, set_parameters
 from src.helper.filepaths import FilePaths as FP
@@ -21,12 +21,12 @@ class SlServerModel(NumPyServerModel):
         self.sl_configuration = sl_configuration
         self.dataset_name = dataset_name
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        print(f"Server uses {self.device}")
         self.model_name = read_json(
             FP.SL_MODEL_CONFIG,
             [self.dataset_name, self.sl_configuration, "server_model"]
         )
 
-        set_seed(seed)
         self.model = simple_init_model_from_string(self.model_name, n_classes).to(self.device)
         self.criterion = torch.nn.CrossEntropyLoss() if self.sl_configuration == "plain" else None
 

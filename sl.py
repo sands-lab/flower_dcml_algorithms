@@ -37,6 +37,7 @@ def run(cfg):
         dataset_name=data_config["dataset_name"],
         seed=cfg.general.seed,
         n_classes=n_classes,
+        sl_configuration=cfg.fl_algorithm.strategy.sl_configuration,
         _partial_=True
     )
 
@@ -67,7 +68,8 @@ def run(cfg):
             partition_folder=partition_folder,
             seed=cfg.general.seed,
             experiment_folder=temp_dir,
-            separate_val_test_sets=cfg.general.separate_val_test_sets
+            separate_val_test_sets=cfg.general.separate_val_test_sets,
+            sl_configuration=cfg.fl_algorithm.strategy.sl_configuration
         )
 
         random_client_capacities = \

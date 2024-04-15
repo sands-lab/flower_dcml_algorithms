@@ -1,5 +1,6 @@
+psutil==5.9.8
 conf==0.4.1
-flwr==1.6.0
+flwr[simulation]==1.6.0
 numpy==1.24.4
 pandas==2.0.3
 Pillow==10.1.0
@@ -9,3 +10,4 @@ torchvision==0.16.1
 tqdm==4.66.1
 hydra-core==1.3.2
 wandb==0.16.4
+slower @ git+ssh://git@ssh.github.com:443/sands-lab/slower.git@master

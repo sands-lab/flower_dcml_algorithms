@@ -45,6 +45,9 @@ def main(cfg):
     module_name, class_name = client_class_str.rsplit(".", 1)
     module = importlib.import_module(module_name)
 
+    if is_split_learning:
+        client_init_kwargs["sl_configuration"] = cfg.fl_algorithm.strategy.sl_configuration
+
     # Get the class from the module
     client_class = getattr(module, class_name)
     client_class = MonitorFlwrClient(client_class)
@@ -71,6 +74,6 @@ def main(cfg):
 
 
 if __name__ == "__main__":
-    if os.environ.get(EV.IBEX_SIMULATION, "1") != "0":
+    if os.environ.get(EV.IBEX_SIMULATION, "0") != "0":
         load_dotenv(override=True)
     main()

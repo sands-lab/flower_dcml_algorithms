@@ -59,11 +59,13 @@ def main(cfg):
             "config_client_fit_fn": construct_config_fn(OmegaConf.to_container(cfg.local_train), evaluator),
             "config_server_segnent_fn": construct_config_fn(OmegaConf.to_container(cfg.local_train), None)
         }
+
         server_model_init_fn = instantiate(
             cfg.fl_algorithm.server_model,
             dataset_name=data_config["dataset_name"],
             seed=cfg.general.seed,
             n_classes=n_classes,
+            sl_configuration=cfg.fl_algorithm.strategy.sl_configuration,
             _partial_=True
         )
         strategy_init_kwargs["init_server_model_fn"] = server_model_init_fn
@@ -71,13 +73,15 @@ def main(cfg):
         fit_config_fns = {
             "on_fit_config_fn": construct_config_fn(OmegaConf.to_container(cfg.local_train), evaluator)
         }
+    n_fit_clients = int(n_clients * cfg.global_train.fraction_fit)
+    n_eval_clients = int(n_clients * cfg.global_train.fraction_eval)
     strategy = strategy_class(
         n_classes=n_classes,
         evaluation_freq=cfg.global_train.evaluation_freq,
         fraction_fit=cfg.global_train.fraction_fit,
         fraction_evaluate=cfg.global_train.fraction_eval,
-        min_fit_clients=n_clients,
-        min_evaluate_clients=n_clients,
+        min_fit_clients=n_fit_clients,
+        min_evaluate_clients=n_eval_clients,
         min_available_clients=n_clients,
         evaluate_metrics_aggregation_fn=evaluator.eval_aggregation_fn,
         fit_metrics_aggregation_fn=evaluator.fit_aggregation_fn,
@@ -111,6 +115,6 @@ def main(cfg):
 if __name__ == "__main__":
     if os.environ.get(EV.IBEX_SIMULATION, "0") != "0":
         log(WARNING, "Loading environment variables from `.env. This should only happen if you are running things in a simulation environment")
-        load_dotenv(override=True)
+        load_dotenv()
     load_dotenv("secrets.env", override=True)
     main()

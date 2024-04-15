@@ -22,7 +22,7 @@ def train_model(optimization_config: OptimizationConfig, server_model_proxy: Ser
 
             model.zero_grad()
             embeddings.backward(error)
-            torch.nn.utils.clip_grad_norm_(model.parameters(), 4.0)
+            torch.nn.utils.clip_grad_norm_(model.parameters(), optimization_config.grad_norm_clipping_param)
             optimizer.step()
 
 
