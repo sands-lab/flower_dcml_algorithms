@@ -2,16 +2,16 @@
 
 # Introduction
 
-This repository contains a set of FL algorithms that support model customization (i.e. different clients have different model architectures). The final goal is to deploy the algorithms to the FL testbed (23 linux devices) and compare the algorithms in terms of accuracy, energy usage, elapsed time, network usage, temperatures on the core, ... in a real-world situation.
+This repository contains a set of FL algorithms that support model customization (i.e. different clients have different model architectures) or split learning.
 
 The framework is easy to extend: you just need to include the server logic in a python script in the `src/strategies` folder, the client logic in a script in the `src/clients` folder, and a configuration file in the `config/fl_algorithm` folder. Check out existing algorithms to see the provided level of abstraction and to find quite a bit of re-usable logic (decorators, functions, methods, ...), which may help you so as not to write too much flower boilerplate code.
 
 
 ## Data preparation
 
-Any data preparation (download, partitioning, distribution to clients, ...) needs to be done off-line, i.e. before running the actual FL experiment. This is done so as not to introduce any computational requirements to the clients.
+Any data preparation (download, partitioning, distribution to clients, ...) needs to be done off-line, i.e. before running the actual FL experiment. This is done so as not to introduce any computational requirements to the clients when deploying the algorithms on the testbed.
 
-To download the data and create the partitionings, you may use the `generate_partitions.py` script. This script automatically downloads the data, saves it in the required format, and generates the files that determine the partitioning. For instance:
+To download the data and create the client dataset-subsets, you may use the `generate_partitions.py` script. This script automatically downloads the data, saves it in the required format, and generates the files that determine the partitioning. For instance:
 
 ```bash
 python generate_partitions.py \
@@ -19,17 +19,18 @@ python generate_partitions.py \
     --n_clients=50 \
     --seed=1602 \
     --test_percentage=0.2 \
-    --partitioning_method=dirichlet \
-    --alpha=50 \
-    --min_size_of_dataset=10
+    --partitioning_method=iid \
+    --fixed_training_set_size=200 \
+    --val_percentage=0.1
 ```
 
-generates a `data/partitions/cifar10/dirichlet_50clients_1602seed_50.0alpha_0.2test` folder. This contains a `generation_config.json` file with the configuration stored in a `.json` file, and two `.csv` files for every client:
+generates a `data/partitions/cifar10/iid_50clients_1602seed_0.2test_0.1val_0holdoutsize_200trainsize` folder. This contains a `generation_config.json` file with the configuration stored in a `.json` file, and three `.csv` files for every client:
 
 - a `partition_X_train.csv`, where *X* is the sequence number of the client;
 - a `partition_X_test.csv`, where *X* is the sequence number of the client.
+- a `partition_X_val.csv`, where *X* is the sequence number of the client.
 
-Note, that the script requires the path, where should the raw data be stored, to be set as an environment variable, `FLTB_DATA_HOME_FOLDER`. This value should be constant across all experiments so as not to store the same data points multiple times. The value of the environment variable can be set in the `.env` configuration file when running the test on IBEX, while it should be set by the runtime when running the actual experiment on the testbed.
+Note, that the script requires the path, where should the raw data be stored, to be set as an environment variable, `FLTB_DATA_HOME_FOLDER`. This value should be constant across all experiments so as not to store the same data points multiple times. The value of the environment variable can be set in the `.env` configuration file when running the test on a simulation environment, while it should be set by the runtime when running the actual experiment on the testbed.
 
 For further details regarding how to run the script, you may run:
 
@@ -38,9 +39,9 @@ python generate_partitions.py --help
 ```
 
 
-## Testing the algorithms on IBEX
+## Testing the algorithms
 
-To simulate the experiment on IBEX (or locally), you just need to issue the command `python fl.py`. As above, the `FLTB_DATA_HOME_FOLDER` needs to be set. The script will load the configuration from `conf/base_config.yaml` file, which includes:
+To simulate the experiment you just need to issue the command `python fl.py`. As above, the `FLTB_DATA_HOME_FOLDER` needs to be set. The script will load the configuration from `config/hydra/base_config.yaml` file, which includes:
 
 - `dataset`: name of the dataset to be used;
 - `partitioning_configuration` i.e. folder, where are the partition-related data stored, e.g. the `.csv` files with data about the splitting. In other words, this parameter is the folder created by the `generate_partitions.py` script.
@@ -49,9 +50,7 @@ To simulate the experiment on IBEX (or locally), you just need to issue the comm
 
 Note, that `dataset` and `partitioning_configuration` uniquely determine the data partitioning configuration - during runtime, the clients will have data as set in the `data/partitions/{dataset}/{partitioning_configuration}` folder.
 
-Alternatively, you may also run the `./run_experiment.sh` command (**note, I recommended to use fl.py, as it is the method I'm using.**).
-
-To run an experiment with different configuration, you need to override the default configuration in `conf/base_config.yaml`. Here's a few examples how to achieve this:
+To run an experiment with different configuration, you need to override the default configuration in `config/hydra/base_config.yaml`. Here's a few examples how to achieve this:
 
 ```bash
 python fl.py global_train.epochs=20  # run the algorithm for 20 global epochs
@@ -60,13 +59,8 @@ python fl.py global_train.epochs=20  # run the algorithm for 20 global epochs
 
 Refer to hydra documentation for further details on overriding configuration files.
 
-### Configuring environment variables
 
-The `run_server.sh` and the `run_experiment.sh` scripts may be customized with some variables, which are set within the script:
-
-* `LOG_TO_WANDB`: if set to $1$, the accuracy will be persisted and logged to a local folder within the `logs` folder. If set to $0$, the accuracy will only be printed to the output.
-* `SYNC_WITH_WANDB_CLOUD`: if set to $1$, after the experiment the results will be synchronized with the wandb cloud. If set to $0$, the results will only be available locally.
-* `IBEX_SIMULATION`: set to $1$ if running on IBEX, locally, or on docker. Setting the value to $1$ causes the environment variables to be read from the `.env` file. When running on the testbed, all the environment variables should be set by the runtime, so in this case you should set the variable to $0$.
+When running the algorithm on the testbed (or indeed, whenever you want to separately run the client and the server), use the `run_server.py` and the `run_client.py` scripts.
 
 ### Running on docker
 
@@ -90,19 +84,11 @@ Simulation of the accuracy achieved if every client trains independently on its 
 python fl.py fl_algorithm=private_training
 ```
 
-*Comments*:
-
-- this procedure is implemented in Flower. This means, that at every epoch, a sample of clients are sampled and trained with the parameters set in `base_config.yaml`. When evaluating the model, a random sample of clients is selected. The selected clients may or may not have been trained in the last epoch. If this is something you wish to avoid, set `global_train.fraction_fit` to `1.0`, so that every client is trained at every epoch.
-
 #### FedAvg
 
 ```bash
 python fl.py fl_algorithm=fedavg
 ```
-
-*Comments*:
-
-- You can state which model architecture should be used in the `fedavg.yaml` file by setting the `client_capacity` parameter.
 
 
 #### FedProx
@@ -111,10 +97,6 @@ python fl.py fl_algorithm=fedavg
 python fl.py fl_algorithm=fedprox
 ```
 
-*Comments*:
-
-- Set the regularization strength and the model architecture in the `fedprox.yaml` file.
-- Same consideration as for FedAvg regarding model architecture.
 
 #### FD
 
@@ -124,38 +106,13 @@ Implementation of the algorihtm proposed `Communication-Efficient On-Device Mach
 python fl.py fl_algorithm=fd
 ```
 
-*Comments*:
+#### DS-FL (FedMD)
 
-- Set the regularization strength in the `fd.yaml` file;
-- *the uploaded local-average logit vectors from all devices are averaged, resulting in a global-average logit vector per label*, but in the pseudocode the the output logits are never averaged. Also, the output logits are not "global", but are personalized for every client;
-- It is not stated explicitly in the text, but the algorithm requires full client participation;
-- Uses CE as the distillation loss function;
-- the temperature for the softmax function is never addressed, so I assumed it was set to $1$. Nevertheless, this parameter may be changed in the `fd.yaml` file;
-- In the paper, also FedAug is proposed, but we ignore this extension in the implementation;
-Reproducing the paper results:
-
-*Reproducing the results*
-
-- Not stated model architecture, but only the number of parameters. I managed to obtain the same number of parameters by using the architecture called `Net` in https://github.com/pytorch/examples/blob/main/mnist/main.py and by setting all the biases to `False`.
-- The way they construct the non-IID datasets is not completely clear;
-- Not stated which optimizer they used (SGD, Adam, ...), nor any hyperparameter (learning rate, strength of the KD regularization term, ...)
-- From the algorithm, it is not clear how to handle cases in which some client does not have some target labels. Line 8 will result in an exception. In the paper *Distillation-Based Semi-Supervised Federated Learning for Communication-Efficient Collaborative Training With Non-IID Private Data* they propose a solution, but it does not seem right (denominator should have -1 or not depending on whether the client has label or not);
-- could not reproduce the results, probably because different hyperparameters, model architecture etc.
-- The results I obtain are much better than the ones reported in the paper;
-- The algorithm as implemented outperforms private training.
-
-#### DS-FL
-
-Implementation of `Distillation-Based Semi-Supervised Federated Learning for Communication-Efficient Collaborative Training With Non-IID Private Data`
+Implementation of `Distillation-Based Semi-Supervised Federated Learning for Communication-Efficient Collaborative Training With Non-IID Private Data` and `FedMD: Heterogenous Federated Learning via Model Distillation`
 
 ```bash
 python fl.py fl_algorithm=ds_fl
 ```
-
-*Comments*:
-
-- From the paper, it is not clear whether every clients needs to participate in every training epoch (*the evaluations are conducted without any missing clients per round*). In the implementation, we support partial client participation under the condition, that the same set of clients is sampled during the update and distillation phase in algorithm 1.;
-- In the implementation, the clients do not share the index set of the data points for the next training epoch. Instead, the whole public dataset is exchanged at every training epoch.
 
 #### Lg-FedAvg
 
@@ -163,31 +120,6 @@ Implementation of `Think Locally, Act Globally: Federated Learning with Local an
 
 ```bash
 python fl.py fl_algorithm=lg_fedavg
-```
-
-*Comments*:
-
-- In section C.2.2 the authors say that:
-    - They resize the input images to 224x224, but this doesn't make sense! Besides, in the code they don't do it https://github.com/pliang279/LG-FedAvg/blob/master/utils/train_utils.py;
-    - `We use the two convolutional layers for the global model` but this is just the opposite of what they are doing! In the paper they propose to use the lowermost layers as private model and uppermost as public model!
-- In the repository, they say that in order to reproduce the results, you first need to run FedAvg and then load the model obtained with FedAvg and further train it with LG-FedAvg, but in the paper they never say they do anything of the sort. In the paper they only say in section C.2.2 that *We train LG-FEDAVG with global updates until we reach a goal accuracy (57% for CIFAR-10) before training for additional rounds to jointly update local and global models.*.....
-- In section C.2.1 they say they use the last two layers to form the global model, but in order to get the stated number of parameters you need to take the last $3$ layers.
-
-#### PerFed
-
-Implementation of `Federated Learning with Personalization Layers`.
-
-```bash
-python fl.py fl_algorithm=perfed
-```
-
-#### FedRecon
-
-Implementation of `Federated Reconstruction: Partially Local Federated Learning`
-
-
-```bash
-python fl.py fl_algorithm=fedrecon
 ```
 
 
@@ -217,7 +149,6 @@ Implementation of `EXPANDING THE REACH OF FEDERATED LEARNING BY REDUCING CLIENT 
 python fl.py fl_algorithm=federated_dropout
 ```
 
-### Work in progress
 
 #### FedKD
 
@@ -227,24 +158,15 @@ Implementation of `FedKD: Communication Efficient Federated Learning via Knowled
 python fl.py fl_algorithm=fedkd
 ```
 
-*Comments*:
 
-- The way it is written `Algorithm 1` in the paper, it seems that gradients are synchronized after each GD update. However, this seems very inefficient (also considering that the paper is titled "communication efficient"), so we resolve to use a more practical approach, i.e. training for a given number of local training epochs;
-- In the paper, the authors propose SVD & encription to reduce communication and to increase security. However, security is not the focus of this repository, so we omit it. Also, implementing SVD only for this algorithm would give to this algorithm an unfair advantage over the others. Therefore, in the implementation we omit SVD-ing the gradients.
+#### Split Learning
 
-
-#### FedGKT
-
-Implementation of `Group Knowledge Transfer:
-Federated Learning of Large CNNs at the Edge`
+In this case, you need to use the `sl.py` script (no changes required to the `run_client.py` and `run_server.py` scripts)
 
 ```bash
-python fl.py fl_algorithm=fedgkt
+python sl.py fl_algorithm=split_learning
 ```
 
-*Comments*:
-
-- Implementation contains some bug
 
 ## Logging data to W&B
 
@@ -263,14 +185,9 @@ WANDB_PROJECT=<fill your value>
 
 ## Model customization
 
-In several algorithms, each client may independently choose its model architecture (restrictions apply depending on the algorithm, e.g. in PerFed all model architectures need to share the same architecture for the lowermost layers). In the implementation, this is achieved by assigning to every client an integer value $C$ which states its capacity. In the testbed, this value will need to be configured manually, while in the simulations (`fl.py`) this value is set randomly.
+In several algorithms, each client may independently choose its model architecture (restrictions apply depending on the algorithm, e.g. in PerFed all model architectures need to share the same architecture for the lowermost layers). In the implementation, this is achieved by assigning to every client an integer value $C$ which states its capacity. In the testbed, this value is configured manually, while in the simulations (`fl.py`) this value is set randomly.
 
-Either way, after determining the model capacity, the client loads the model as specified in the `model_mapping.json` file.
+Either way, model customization is configured in the following `.json` files:
 
-## TO-DOs
-
-- Check all the algorithms implemented so far for correctness;
-- Correct FedGKT;
-- Try to reproduce some results;
-- Next implement: FedKD, HeteroFL/FjORD, FedRolex, Federated Dropout;
-- Run experiment on testbed.
+- `config/colext/device_capacities.json`: configure the mapping device type - capacity tier;
+- `config/models/*`: configuration for all the models used by the algorithms.
