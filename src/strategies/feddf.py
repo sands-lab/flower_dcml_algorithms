@@ -48,6 +48,7 @@ class FedDF(FedProx):
         self.model_arrays = None
 
     def initialize_parameters(self, client_manager: HeterogeneousClientManager) -> Parameters:
+        client_manager.wait_clients()
         noins = GetParametersIns({})
         clients = client_manager.all()
         model_arrays = []

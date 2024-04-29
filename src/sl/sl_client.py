@@ -176,6 +176,11 @@ class SlClient(NumPyClient):
 
         return accuracy, dataset_size, out_dict
 
+    def get_properties(self, config):
+        return {
+            "client_capacity": 0
+        }
+
 
 def client_fn(cid, **kwargs) -> SlClient:
     # print("client fn")

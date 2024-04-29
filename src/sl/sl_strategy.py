@@ -38,9 +38,6 @@ class SlStrategy(PlainSlStrategy):
             client_parameteres += get_parameters(
                 simple_init_model_from_string(config["client_head"], self.n_classes)
             )
-            print(client_parameteres[-1])
-        else:
-            print(server_parameteres[-1])
         self.client_parameters, self.server_parameters = client_parameteres, server_parameteres
 
     def initialize_client_parameters(self, client_manager: ClientManager):
